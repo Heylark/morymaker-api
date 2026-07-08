@@ -1,0 +1,12 @@
+server:
+  port: 30100
+
+spring:
+  application:
+    name: morymaker-api
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
