@@ -26,6 +26,9 @@ interface GuestMapper {
     /** 체크인 by token(seat_group LEFT JOIN). */
     fun selectDetailByToken(@Param("eventId") eventId: String, @Param("token") token: String): GuestListItem?
 
+    /** 전역 token 조회(공개 경로 전용, event_id 조건 없음 — seat_group LEFT JOIN). */
+    fun selectDetailByGlobalToken(@Param("token") token: String): GuestListItem?
+
     /** 목록/검색(seat_group LEFT JOIN + 페이징). `query.paging=false`면 전체 반환. */
     fun search(@Param("eventId") eventId: String, @Param("query") query: GuestSearchQuery): List<GuestListItem>
 
