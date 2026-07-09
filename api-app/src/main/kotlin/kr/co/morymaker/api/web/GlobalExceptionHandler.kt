@@ -79,6 +79,13 @@ class GlobalExceptionHandler {
         ResponseEntity.status(HttpStatus.NOT_FOUND)
             .body(ErrorBody(ErrorDetail("NOT_FOUND", e.message ?: "리소스를 찾을 수 없습니다")))
 
+    // @Valid 애노테이션이 표현할 수 없는 요청 형태 검증(예: 두 필드 중 최소 하나 필수 —
+    // CheckinRequest의 token/guestId)은 컨트롤러가 직접 던지는 이 예외로 처리한다.
+    @ExceptionHandler(IllegalArgumentException::class)
+    fun handleIllegalArgument(e: IllegalArgumentException): ResponseEntity<ErrorBody> =
+        ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            .body(ErrorBody(ErrorDetail("VALIDATION_FAILED", e.message ?: "입력값을 확인해 주세요")))
+
     // 매핑되지 않은 경로 — Spring 6.1+는 정적 리소스 핸들러가 이 예외를 던진다(과거의 "그냥
     // sendError(404)" 방식 대신). catch-all(Exception)이 먼저 잡아 500으로 응답하지 않도록
     // 명시적으로 404로 매핑해야 한다.

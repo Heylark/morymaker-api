@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+    ParkingRecordMapper.xml — parking_record 테이블(1테이블1파일).
+
+    guest 명단·체크인 범위에서는 guest 방향 최소 3쿼리만 정의한다(주차↔참석자 교차 최소 범위).
+    전체 parking 도메인(zone·slot·출차·zone JOIN 등)의 columns/BaseResultMap/CRUD는 후속 주차
+    도메인 작업이 이 파일에 이어 붙인다 — 지금은 컬럼 목록·resultMap 자체를 아직 정의하지 않는다
+    (scalar 반환만 사용하므로 필요 없다).
+-->
+<mapper namespace="kr.co.morymaker.api.persistence.mapper.ParkingRecordMapper">
+
+    <!-- idx_precord_plate(event_id, plate) 커버. status='주차중'인 활성 기록만 매칭 대상. -->
+    <select id="selectActiveRecordIdByPlate" resultType="string">
+        SELECT id
+        FROM parking_record
+        WHERE event_id = #{eventId}
+          AND plate = #{plate}
+          AND status = '주차중'
+        LIMIT 1
+    </select>
+
+    <!-- idx_precord_guest(guest_id) 커버. 체크인 응답 주차 위치 병기(§5-1)용. -->
+    <select id="selectActiveSlotSigByGuestId" resultType="string">
+        SELECT slot_sig
+        FROM parking_record
+        WHERE event_id = #{eventId}
+          AND guest_id = #{guestId}
+          AND status = '주차중'
+        LIMIT 1
+    </select>
+
+    <update id="linkGuest">
+        UPDATE parking_record
+           SET guest_id = #{guestId}
+         WHERE id = #{recordId}
+    </update>
+
+</mapper>
