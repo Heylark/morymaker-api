@@ -11,7 +11,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * 현장등록 공개 POST 전용 rate limit(D4) — 인메모리 고정윈도(client IP 키). 초기 단일 인스턴스
+ * 현장등록 공개 POST 전용 rate limit — 인메모리 고정윈도(client IP 키). 초기 단일 인스턴스
  * 운영을 전제로 한다(다중 인스턴스로 확장되면 분산 카운터가 필요 — 이번 범위 밖, 변경 시점 등급).
  *
  * `WebMvcConfig`가 현장등록 경로 하위 전체(GET 폼·POST 등록 모두 매칭)에 이 인터셉터를 등록하므로,

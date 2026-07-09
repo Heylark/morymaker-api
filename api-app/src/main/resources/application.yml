@@ -47,6 +47,6 @@ morymaker:
     # 주차 진입 QR 스캔 URL(정적값) — 자리 딥링크 기능(후속 작업)의 실데이터 의존 없음.
     park-scan-url: ${PUBLIC_PARK_SCAN_URL:http://localhost:3000/p}
     rate-limit:
-      # 현장등록 POST 전용 인메모리 고정윈도(IP 키, D4) — 공용 데스크 태블릿 오탐 완화 위해 넉넉히.
+      # 현장등록 POST 전용 인메모리 고정윈도(IP 키) — 공용 데스크 태블릿 오탐 완화 위해 넉넉히.
       limit: ${PUBLIC_RATE_LIMIT:20}
       window-seconds: ${PUBLIC_RATE_LIMIT_WINDOW_SECONDS:60}

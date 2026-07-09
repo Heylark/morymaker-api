@@ -7,8 +7,8 @@ import kr.co.morymaker.api.domain.guest.Guest
  * 현장등록 유스케이스 포트-in(§10-5·§10-6) — api-app의 `PublicOnsiteController`가 호출한다.
  *
  * 무인증 공개 경로다 — `EventScopeGuard.assertAccess`를 호출하지 않는다. eventCode는
- * `event.id`(UUID) 재사용(D2, 마이그레이션 0)이라 별도 코드 해석 없이 그대로 `EventPort.fetch`에
- * 전달된다. 무효 eventCode는 [NoSuchElementException](404), 종료된 행사는
+ * `event.id`(UUID)를 그대로 재사용하므로(신규 마이그레이션 없음) 별도 코드 해석 없이 그대로
+ * `EventPort.fetch`에 전달된다. 무효 eventCode는 [NoSuchElementException](404), 종료된 행사는
  * [kr.co.morymaker.api.application.service.EventNotOpenException](409)으로 거부한다 — 두
  * 메서드(폼 조회·등록) 모두 동일 게이트를 적용한다(§10-5·§10-6 "동일 게이트").
  */

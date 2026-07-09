@@ -23,8 +23,8 @@ import org.springframework.transaction.annotation.Transactional
  * 부작용 0) · 차량 사전등록 백필을 실 MariaDB로 검증한다.
  *
  * 명단 등록·조회는 `GuestControllerTest`와 동일 컨벤션(`.with(jwt())`)으로 관리자 API를 먼저
- * 호출해 준비하고, 공개 엔드포인트 자체는 인증 없이 호출한다 — 이 비대칭이 곧 D1(무인증 쓰기
- * 인가 모델)의 핵심 실증이다.
+ * 호출해 준비하고, 공개 엔드포인트 자체는 인증 없이 호출한다 — 이 비대칭이 곧 무인증 쓰기
+ * 인가 모델의 핵심 실증이다.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -69,7 +69,7 @@ class PublicHubControllerTest(
         return data.get("id").asText() to data.get("token").asText()
     }
 
-    // ── 무인증 접근(P1 — D1 핵심 실증) ────────────────────────────────
+    // ── 무인증 접근(P1 — 무인증 쓰기 인가 모델 핵심 실증) ────────────────────────────────
 
     @Test
     fun `인증 헤더 없이 유효 token으로 개인 허브를 조회하면 200과 4요소를 받는다`() {

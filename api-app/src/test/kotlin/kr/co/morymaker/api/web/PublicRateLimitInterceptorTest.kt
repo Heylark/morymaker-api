@@ -8,7 +8,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 /**
- * [PublicRateLimitInterceptor] 단위 테스트(D4) — 인메모리 고정윈도 임계 판정·GET 미검사·IP별
+ * [PublicRateLimitInterceptor] 단위 테스트 — 인메모리 고정윈도 임계 판정·GET 미검사·IP별
  * 독립 카운팅을 검증한다.
  */
 class PublicRateLimitInterceptorTest {

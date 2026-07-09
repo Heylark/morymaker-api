@@ -19,8 +19,8 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.transaction.annotation.Transactional
 
 /**
- * 현장등록 공개 API(§10-5·§10-6) 통합 테스트 — 무인증 접근·eventCode(=event.id, D2) 존재·
- * status 게이트(D5, 종료만 거부)·즉시 체크인 QR 발급을 실 MariaDB로 검증한다.
+ * 현장등록 공개 API(§10-5·§10-6) 통합 테스트 — 무인증 접근·eventCode(=event.id 재사용) 존재·
+ * status 게이트(종료만 거부)·즉시 체크인 QR 발급을 실 MariaDB로 검증한다.
  *
  * 종료 상태 전이는 관리 API가 아직 없어(행사 상태 변경은 이번 REQ 범위 외) `JdbcTemplate`으로
  * 직접 DB 행을 갱신한다 — `@Transactional` 롤백 범위 안이라 다른 테스트에 영향을 남기지 않는다.

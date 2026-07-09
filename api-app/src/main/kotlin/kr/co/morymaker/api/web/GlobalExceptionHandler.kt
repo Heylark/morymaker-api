@@ -80,13 +80,13 @@ class GlobalExceptionHandler {
         ResponseEntity.status(HttpStatus.NOT_FOUND)
             .body(ErrorBody(ErrorDetail("NOT_FOUND", e.message ?: "리소스를 찾을 수 없습니다")))
 
-    // 현장등록 status 게이트(D5) — 종료된 행사만 이 예외 대상이다(준비·운영중은 정상 진행).
+    // 현장등록 status 게이트 — 종료된 행사만 이 예외 대상이다(준비·운영중은 정상 진행).
     @ExceptionHandler(EventNotOpenException::class)
     fun handleEventNotOpen(e: EventNotOpenException): ResponseEntity<ErrorBody> =
         ResponseEntity.status(HttpStatus.CONFLICT)
             .body(ErrorBody(ErrorDetail("EVENT_CLOSED", e.message ?: "종료된 행사입니다")))
 
-    // 현장등록 공개 POST rate limit(D4) 초과 — PublicRateLimitInterceptor가 던진다.
+    // 현장등록 공개 POST rate limit 초과 — PublicRateLimitInterceptor가 던진다.
     @ExceptionHandler(RateLimitExceededException::class)
     fun handleRateLimitExceeded(e: RateLimitExceededException): ResponseEntity<ErrorBody> =
         ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)

@@ -100,8 +100,8 @@
     <!--
         공개(비로그인) 경로 전용 — event_id 조건 없이 token 단독으로 조회한다. token은
         uk_guest_token UNIQUE라 전역에서 최대 1건만 매칭되며, 이 쿼리 자체가 이미 인가(공개
-        경로는 assertAccess를 호출하지 않고 token capability 유효성 검증으로 대체 — 02-architect
-        ADR-001)의 실행 지점이다.
+        경로는 행사 스코프 가드를 호출하지 않고 token capability 유효성 검증으로 대체한다)의
+        실행 지점이다.
     -->
     <select id="selectDetailByGlobalToken" resultMap="DetailResultMap">
         SELECT

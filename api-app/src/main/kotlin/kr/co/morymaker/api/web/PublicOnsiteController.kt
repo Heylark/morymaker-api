@@ -20,8 +20,8 @@ import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 
 /**
- * 현장등록 공개 API(§10-5·§10-6) — 무인증. eventCode(=event.id, D2)의 존재·상태(D5)만으로
- * 인가를 대체한다. POST는 `PublicRateLimitInterceptor`(D4, `WebMvcConfig`가 등록)가 스팸 방어를
+ * 현장등록 공개 API(§10-5·§10-6) — 무인증. eventCode(=event.id를 그대로 재사용)의 존재·상태만으로
+ * 인가를 대체한다. POST는 `PublicRateLimitInterceptor`(`WebMvcConfig`가 등록)가 스팸 방어를
  * 담당한다 — 이 컨트롤러는 `@PreAuthorize`를 두지 않는다.
  */
 @RestController

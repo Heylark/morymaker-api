@@ -4,7 +4,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 
 /**
  * 공개(비로그인) 표면 설정(`morymaker.public.*`) — QR/딥링크 URL 조립 베이스와 현장등록
- * rate limit(D4) 임계값을 담는다. 재배포 없이 튜닝 가능하도록 application.yml에서 주입한다.
+ * rate limit 임계값을 담는다. 재배포 없이 튜닝 가능하도록 application.yml에서 주입한다.
  *
  * 생성자가 단일이라 Spring Boot가 constructor binding으로 자동 인식한다 — `@Component`를
  * 함께 붙이면 일반 빈 생성 경로와 충돌해 기동 실패로 이어진다(`String` 파라미터를 빈으로

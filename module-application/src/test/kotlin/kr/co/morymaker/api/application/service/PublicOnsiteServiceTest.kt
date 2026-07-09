@@ -17,7 +17,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 
 /**
- * [PublicOnsiteService] 단위 테스트(§10-5·§10-6) — eventCode(=event.id) 존재·status 게이트(D5)·
+ * [PublicOnsiteService] 단위 테스트(§10-5·§10-6) — eventCode(=event.id) 존재·status 게이트(종료만 거부)·
  * [GuestWriteSupport] 위임을 검증한다.
  */
 class PublicOnsiteServiceTest {
