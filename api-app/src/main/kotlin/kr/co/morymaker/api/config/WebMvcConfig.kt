@@ -1,6 +1,7 @@
 package kr.co.morymaker.api.config
 
 import kr.co.morymaker.api.security.EventScopeInterceptor
+import kr.co.morymaker.api.web.PublicRateLimitInterceptor
 import org.springframework.context.annotation.Configuration
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
@@ -12,9 +13,13 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 @Configuration
 class WebMvcConfig(
     private val eventScopeInterceptor: EventScopeInterceptor,
+    private val publicRateLimitInterceptor: PublicRateLimitInterceptor,
 ) : WebMvcConfigurer {
 
     override fun addInterceptors(registry: InterceptorRegistry) {
         registry.addInterceptor(eventScopeInterceptor).addPathPatterns("/api/events/**")
+        // 현장등록 GET(폼 렌더)·POST(등록) 모두 이 패턴에 매칭되지만, 인터셉터 내부에서 POST만
+        // 실제로 검사한다(D4 — 폼 조회·개인허브(/u)는 스팸 위협이 낮아 대상이 아니다).
+        registry.addInterceptor(publicRateLimitInterceptor).addPathPatterns("/api/public/r/**")
     }
 }

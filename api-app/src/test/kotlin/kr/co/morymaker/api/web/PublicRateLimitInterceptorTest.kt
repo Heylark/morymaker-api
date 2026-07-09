@@ -1,0 +1,61 @@
+package kr.co.morymaker.api.web
+
+import kr.co.morymaker.api.config.PublicProperties
+import org.junit.jupiter.api.Test
+import org.springframework.mock.web.MockHttpServletRequest
+import org.springframework.mock.web.MockHttpServletResponse
+import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
+
+/**
+ * [PublicRateLimitInterceptor] 단위 테스트(D4) — 인메모리 고정윈도 임계 판정·GET 미검사·IP별
+ * 독립 카운팅을 검증한다.
+ */
+class PublicRateLimitInterceptorTest {
+
+    private fun interceptor(limit: Int = 3, windowSeconds: Int = 60) = PublicRateLimitInterceptor(
+        PublicProperties(
+            eventBaseUrl = "http://localhost:3000",
+            parkScanUrl = "http://localhost:3000/p",
+            rateLimit = PublicProperties.RateLimit(limit = limit, windowSeconds = windowSeconds),
+        ),
+    )
+
+    private fun postRequest(ip: String) = MockHttpServletRequest("POST", "/api/public/r/ev1").apply { remoteAddr = ip }
+    private fun getRequest(ip: String) = MockHttpServletRequest("GET", "/api/public/r/ev1").apply { remoteAddr = ip }
+
+    @Test
+    fun `한도 이내 요청은 통과한다`() {
+        val target = interceptor(limit = 3)
+        repeat(3) {
+            assertTrue(target.preHandle(postRequest("1.1.1.1"), MockHttpServletResponse(), Any()))
+        }
+    }
+
+    @Test
+    fun `한도를 초과하면 RateLimitExceededException을 던진다`() {
+        val target = interceptor(limit = 2)
+        target.preHandle(postRequest("2.2.2.2"), MockHttpServletResponse(), Any())
+        target.preHandle(postRequest("2.2.2.2"), MockHttpServletResponse(), Any())
+
+        assertFailsWith<RateLimitExceededException> {
+            target.preHandle(postRequest("2.2.2.2"), MockHttpServletResponse(), Any())
+        }
+    }
+
+    @Test
+    fun `GET 요청은 검사 대상이 아니다(한도 초과해도 통과)`() {
+        val target = interceptor(limit = 1)
+        repeat(5) {
+            assertTrue(target.preHandle(getRequest("3.3.3.3"), MockHttpServletResponse(), Any()))
+        }
+    }
+
+    @Test
+    fun `IP별로 독립 카운팅된다`() {
+        val target = interceptor(limit = 1)
+        assertTrue(target.preHandle(postRequest("4.4.4.4"), MockHttpServletResponse(), Any()))
+        // 다른 IP는 별도 윈도를 가지므로 여기서 429가 나면 안 된다.
+        assertTrue(target.preHandle(postRequest("5.5.5.5"), MockHttpServletResponse(), Any()))
+    }
+}
