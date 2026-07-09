@@ -51,7 +51,7 @@ internal class CheckinService(
         }
 
         val parking = parkingLinkPort.findActiveSlotByGuestId(eventId, guest.id)
-            ?.let { ParkingView(slotSig = it.slotSig, display = deriveParkingDisplay(it.slotSig)) }
+            ?.let { ParkingView(slotSig = it.slotSig, display = ParkingDisplay.derive(it.slotSig)) }
         return CheckinResult(resultCode, resultGuest, parking)
     }
 
@@ -74,10 +74,5 @@ internal class CheckinService(
     private fun fetchTarget(eventId: String, target: CheckinTarget): GuestListItem? = when (target) {
         is CheckinTarget.ByToken -> guestPort.fetchDetailByToken(eventId, target.token)
         is CheckinTarget.ByGuestId -> guestPort.fetchDetailById(eventId, target.gid)
-    }
-
-    companion object {
-        /** slotSig("지하 2층·A구역·3")의 `·` 구분자만 공백으로 정규화 — 완전 포맷팅은 §6 이연. */
-        private fun deriveParkingDisplay(slotSig: String): String = slotSig.replace("·", " ")
     }
 }
