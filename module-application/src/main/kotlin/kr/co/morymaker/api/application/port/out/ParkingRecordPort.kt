@@ -10,8 +10,8 @@ import kr.co.morymaker.api.domain.parking.ParkingRecord
  */
 interface ParkingRecordPort {
 
-    /** 대상 자리 활성 기록 잠금 조회(P1) — `SELECT ... FOR UPDATE`, 활성 트랜잭션 안에서만 유효. */
-    fun selectActiveForUpdate(eventId: String, slotSig: String): ParkingRecord?
+    /** 대상 자리 활성 기록 조회(P1, v2) — 케이스 판정용 단순 조회. 동시성 방어는 active_key UNIQUE 단독. */
+    fun selectActiveBySlot(eventId: String, slotSig: String): ParkingRecord?
 
     /** 같은 차량번호의 다른-자리 활성 기록 조회(§4-1 케이스 판정용). */
     fun selectActiveByPlate(eventId: String, plate: String): ParkingRecord?

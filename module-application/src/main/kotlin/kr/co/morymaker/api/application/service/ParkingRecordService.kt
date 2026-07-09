@@ -13,6 +13,7 @@ import kr.co.morymaker.api.application.port.out.RecordSearchQuery
 import kr.co.morymaker.api.application.security.EventScopeGuard
 import kr.co.morymaker.api.domain.parking.ParkingRecord
 import org.springframework.dao.DuplicateKeyException
+import org.springframework.dao.PessimisticLockingFailureException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
@@ -25,10 +26,11 @@ import java.util.UUID
  * 헥사고날 레이어: application(service). `internal`: api-app은 [ParkingRecordUseCase]
  * 인터페이스만 의존한다.
  *
- * [register]는 `@Transactional`(REQUIRED) 안에서 [ParkingRecordPort.selectActiveForUpdate]로
- * 대상 자리를 잠근 뒤 케이스를 분기한다(02-architect §4-1 결정적 우선순위 표) — self-call·
- * REQUIRES_NEW 없이 이 메서드 하나가 트랜잭션 경계를 이룬다(데드락 회피, kotlin-conventions
- * §1-4).
+ * [register]는 `@Transactional`(REQUIRED) 안에서 [ParkingRecordPort.selectActiveBySlot]로
+ * 대상 자리 활성 기록을 조회해 케이스를 분기한다(02-architect §4-1 결정적 우선순위 표) — 이 조회는
+ * 잠금을 걸지 않는다. 동시 경쟁 방어는 active_key UNIQUE 제약 단독이 담당하며, 위반 시
+ * [guardingSlotUniqueness]가 409로 번역한다. self-call·REQUIRES_NEW 없이 이 메서드 하나가
+ * 트랜잭션 경계를 이룬다(kotlin-conventions §1-4).
  */
 @Service
 internal class ParkingRecordService(
@@ -60,8 +62,8 @@ internal class ParkingRecordService(
         ) { "registeredBy는 셀프 또는 요원만 가능합니다" }
 
         val normPlate = normalizePlate(command.plate)
-        // 대상 자리 활성 기록 잠금(P1) — 이 트랜잭션이 끝날 때까지 같은 자리의 동시 승계를 직렬화한다.
-        val targetActive = recordPort.selectActiveForUpdate(eventId, command.slotSig)
+        // 대상 자리 활성 기록 조회(P1, v2) — 동시 경쟁은 active_key UNIQUE가 최종 방어.
+        val targetActive = recordPort.selectActiveBySlot(eventId, command.slotSig)
         val plateActive = recordPort.selectActiveByPlate(eventId, normPlate)
 
         val outcome = when {
@@ -75,7 +77,7 @@ internal class ParkingRecordService(
             targetActive != null && plateActive == null -> {
                 recordPort.checkout(targetActive.id)
                 val newRecord = buildNewRecord(eventId, command, normPlate, reviewNeeded = true)
-                insertGuarded(newRecord)
+                guardingSlotUniqueness { recordPort.insert(newRecord) }
                 val superseded = targetActive.with(status = ParkingRecord.STATUS_CHECKED_OUT)
                 Outcome(RegisterParkingResult.RESULT_SUPERSEDED, newRecord, superseded)
             }
@@ -83,20 +85,20 @@ internal class ParkingRecordService(
             targetActive != null -> {
                 recordPort.checkout(targetActive.id)
                 val moved = plateActive!!.with(slotSig = command.slotSig, zoneId = command.zoneId, reviewNeeded = true)
-                recordPort.updateSlotMove(moved)
+                guardingSlotUniqueness { recordPort.updateSlotMove(moved) }
                 val superseded = targetActive.with(status = ParkingRecord.STATUS_CHECKED_OUT)
                 Outcome(RegisterParkingResult.RESULT_SUPERSEDED, moved, superseded)
             }
             // 케이스 D — 자리 이동(빈 대상, 요청 차량이 다른 자리에 이미 활성).
             plateActive != null -> {
                 val moved = plateActive.with(slotSig = command.slotSig, zoneId = command.zoneId)
-                recordPort.updateSlotMove(moved)
+                guardingSlotUniqueness { recordPort.updateSlotMove(moved) }
                 Outcome(RegisterParkingResult.RESULT_RE_REGISTERED, moved, superseded = null)
             }
             // 케이스 E — 신규 주차(빈 대상, 요청 차량 미주차). 동시 최초 주차는 UNIQUE가 최종 방어.
             else -> {
                 val newRecord = buildNewRecord(eventId, command, normPlate, reviewNeeded = false)
-                insertGuarded(newRecord)
+                guardingSlotUniqueness { recordPort.insert(newRecord) }
                 Outcome(RegisterParkingResult.RESULT_PARKED, newRecord, superseded = null)
             }
         }
@@ -129,14 +131,16 @@ internal class ParkingRecordService(
         return existing.with(reviewNeeded = false)
     }
 
-    /** 신규 삽입(케이스 B·E) — active_key UNIQUE 위반은 자리 점유로 확정 번역해 409로 던진다(P5). */
-    private fun insertGuarded(record: ParkingRecord) {
+    // active_key(자리 유일성) 경쟁 실패를 자리 점유(409)로 번역한다. insert(B·E)와
+    // 자리 이동 update(C·D) 모두 같은 UNIQUE로 직렬화되므로 동일 가드로 감싼다.
+    private inline fun <T> guardingSlotUniqueness(block: () -> T): T =
         try {
-            recordPort.insert(record)
-        } catch (e: DuplicateKeyException) {
+            block()
+        } catch (e: DuplicateKeyException) { // 선착이 이미 자리 점유(UNIQUE 위반)
+            throw SlotOccupiedException()
+        } catch (e: PessimisticLockingFailureException) { // 고동시성 락 경합(중복키 insert 데드락·락 timeout)
             throw SlotOccupiedException()
         }
-    }
 
     private fun buildNewRecord(
         eventId: String,

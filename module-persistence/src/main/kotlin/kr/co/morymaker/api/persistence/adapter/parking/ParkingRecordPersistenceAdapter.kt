@@ -18,8 +18,8 @@ internal class ParkingRecordPersistenceAdapter(
     private val recordMapper: ParkingRecordMapper,
 ) : ParkingRecordPort {
 
-    override fun selectActiveForUpdate(eventId: String, slotSig: String): ParkingRecord? =
-        recordMapper.selectActiveForUpdate(eventId, slotSig)
+    override fun selectActiveBySlot(eventId: String, slotSig: String): ParkingRecord? =
+        recordMapper.selectActiveBySlot(eventId, slotSig)
 
     override fun selectActiveByPlate(eventId: String, plate: String): ParkingRecord? =
         recordMapper.selectActiveByPlate(eventId, plate)

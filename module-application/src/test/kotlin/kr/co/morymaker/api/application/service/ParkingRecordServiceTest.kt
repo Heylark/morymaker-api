@@ -80,7 +80,7 @@ class ParkingRecordServiceTest {
     @Test
     fun `register는 빈 자리·미주차 차량이면 PARKED로 신규 삽입한다`() {
         every { eventScopeGuard.assertAccess("ev1") } returns Unit
-        every { recordPort.selectActiveForUpdate("ev1", any()) } returns null
+        every { recordPort.selectActiveBySlot("ev1", any()) } returns null
         every { recordPort.selectActiveByPlate("ev1", "12가3456") } returns null
         val inserted = slot<ParkingRecord>()
         every { recordPort.insert(capture(inserted)) } returns Unit
@@ -100,7 +100,7 @@ class ParkingRecordServiceTest {
     @Test
     fun `register는 신규 삽입 시 active_key UNIQUE 위반을 SlotOccupiedException으로 번역한다`() {
         every { eventScopeGuard.assertAccess("ev1") } returns Unit
-        every { recordPort.selectActiveForUpdate("ev1", any()) } returns null
+        every { recordPort.selectActiveBySlot("ev1", any()) } returns null
         every { recordPort.selectActiveByPlate("ev1", any()) } returns null
         every { recordPort.insert(any()) } throws DuplicateKeyException("uq_precord_active")
 
@@ -113,7 +113,7 @@ class ParkingRecordServiceTest {
     fun `register는 대상 점유자가 본인이면 RE_REGISTERED로 registered_at만 갱신한다`() {
         every { eventScopeGuard.assertAccess("ev1") } returns Unit
         val active = sampleRecord(id = "r1", plate = "12가3456")
-        every { recordPort.selectActiveForUpdate("ev1", active.slotSig) } returns active
+        every { recordPort.selectActiveBySlot("ev1", active.slotSig) } returns active
         every { recordPort.selectActiveByPlate("ev1", "12가3456") } returns active
         every { recordPort.touchRegisteredAt("r1") } returns Unit
         every { recordPort.fetchById("ev1", "r1") } returns active
@@ -134,7 +134,7 @@ class ParkingRecordServiceTest {
     fun `register는 점유 자리에 타 차량이 없이 등록되면 대상을 출차시키고 review_needed로 신규 삽입한다`() {
         every { eventScopeGuard.assertAccess("ev1") } returns Unit
         val occupied = sampleRecord(id = "old", plate = "99나9999")
-        every { recordPort.selectActiveForUpdate("ev1", occupied.slotSig) } returns occupied
+        every { recordPort.selectActiveBySlot("ev1", occupied.slotSig) } returns occupied
         every { recordPort.selectActiveByPlate("ev1", "12가3456") } returns null
         every { recordPort.checkout("old") } returns Unit
         val inserted = slot<ParkingRecord>()
@@ -158,7 +158,7 @@ class ParkingRecordServiceTest {
         every { eventScopeGuard.assertAccess("ev1") } returns Unit
         val occupied = sampleRecord(id = "old", slotSig = "지하 2층·A구역·3", plate = "99나9999")
         val myOther = sampleRecord(id = "mine", slotSig = "지하 2층·A구역·9", plate = "12가3456")
-        every { recordPort.selectActiveForUpdate("ev1", occupied.slotSig) } returns occupied
+        every { recordPort.selectActiveBySlot("ev1", occupied.slotSig) } returns occupied
         every { recordPort.selectActiveByPlate("ev1", "12가3456") } returns myOther
         every { recordPort.checkout("old") } returns Unit
         val moved = slot<ParkingRecord>()
@@ -183,7 +183,7 @@ class ParkingRecordServiceTest {
     fun `register는 대상이 비어있고 내 차량이 다른 자리에 있으면 이동만 수행한다`() {
         every { eventScopeGuard.assertAccess("ev1") } returns Unit
         val myOther = sampleRecord(id = "mine", slotSig = "지하 2층·A구역·9", plate = "12가3456")
-        every { recordPort.selectActiveForUpdate("ev1", "지하 2층·A구역·3") } returns null
+        every { recordPort.selectActiveBySlot("ev1", "지하 2층·A구역·3") } returns null
         every { recordPort.selectActiveByPlate("ev1", "12가3456") } returns myOther
         val moved = slot<ParkingRecord>()
         every { recordPort.updateSlotMove(capture(moved)) } returns Unit
@@ -204,7 +204,7 @@ class ParkingRecordServiceTest {
     @Test
     fun `register는 매핑 성공 시 guest_id를 연결하고 대기 상태를 방문으로 전이한다`() {
         every { eventScopeGuard.assertAccess("ev1") } returns Unit
-        every { recordPort.selectActiveForUpdate("ev1", any()) } returns null
+        every { recordPort.selectActiveBySlot("ev1", any()) } returns null
         every { recordPort.selectActiveByPlate("ev1", any()) } returns null
         val inserted = slot<ParkingRecord>()
         every { recordPort.insert(capture(inserted)) } returns Unit
@@ -225,7 +225,7 @@ class ParkingRecordServiceTest {
     @Test
     fun `register는 매핑 실패 시 아무 것도 갱신하지 않는다`() {
         every { eventScopeGuard.assertAccess("ev1") } returns Unit
-        every { recordPort.selectActiveForUpdate("ev1", any()) } returns null
+        every { recordPort.selectActiveBySlot("ev1", any()) } returns null
         every { recordPort.selectActiveByPlate("ev1", any()) } returns null
         every { recordPort.insert(any()) } returns Unit
         stubNoMapping()
