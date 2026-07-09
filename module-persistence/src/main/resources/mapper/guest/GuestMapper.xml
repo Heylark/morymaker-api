@@ -197,4 +197,45 @@
            AND event_id = #{eventId}
     </update>
 
+    <!-- ➕ §6 신규 — parking→guest 매핑(3-7, P3) 조회·전이. 기존 쿼리·resultMap은 미접촉(additive만). -->
+
+    <!-- plate 완전일치(공백 정규화) 활성 참석자 조회 — 취소자 제외. -->
+    <select id="selectActiveByPlate" resultMap="BaseResultMap">
+        SELECT
+            <include refid="columns"/>
+        FROM guest g
+        WHERE g.event_id = #{eventId}
+          AND REPLACE(g.plate, ' ', '') = #{plate}
+          AND g.status != '취소'
+        LIMIT 1
+    </select>
+
+    <!-- phone 완전일치 활성 참석자 조회(plate 매칭 실패 시 보조) — 취소자 제외. -->
+    <select id="selectActiveByPhone" resultMap="BaseResultMap">
+        SELECT
+            <include refid="columns"/>
+        FROM guest g
+        WHERE g.event_id = #{eventId}
+          AND g.phone = #{phone}
+          AND g.status != '취소'
+        LIMIT 1
+    </select>
+
+    <!-- 대기→방문 가드 전이 — 대기 상태가 아니면 WHERE에서 걸러져 영향 0행(멱등). -->
+    <update id="markVisitedIfWaiting">
+        UPDATE guest
+           SET status = '방문'
+             , visit_at = NOW()
+         WHERE id = #{gid}
+           AND status = '대기'
+    </update>
+
+    <!-- plate 백필 — 기존 값이 비어 있을 때만 갱신(가드). -->
+    <update id="backfillPlateIfEmpty">
+        UPDATE guest
+           SET plate = #{plate}
+         WHERE id = #{gid}
+           AND (plate IS NULL OR plate = '')
+    </update>
+
 </mapper>

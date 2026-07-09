@@ -3,6 +3,7 @@ package kr.co.morymaker.api.web
 import io.mockk.every
 import io.mockk.mockk
 import jakarta.validation.ConstraintViolationException
+import kr.co.morymaker.api.application.parking.SlotOccupiedException
 import org.junit.jupiter.api.Test
 import org.springframework.http.HttpStatus
 import org.springframework.security.access.AccessDeniedException
@@ -80,6 +81,14 @@ class GlobalExceptionHandlerTest {
 
         assertEquals(HttpStatus.NOT_FOUND, response.statusCode)
         assertEquals("NOT_FOUND", response.body?.error?.code)
+    }
+
+    @Test
+    fun `SlotOccupiedException은 409와 SLOT_OCCUPIED를 반환한다`() {
+        val response = handler.handleSlotOccupied(SlotOccupiedException())
+
+        assertEquals(HttpStatus.CONFLICT, response.statusCode)
+        assertEquals("SLOT_OCCUPIED", response.body?.error?.code)
     }
 
     @Test
