@@ -54,6 +54,9 @@ class Event(
         /** 신규 생성 행사의 기본 상태(DB 컬럼 기본값과 동일 — V1__init.sql `status` DEFAULT). */
         const val STATUS_PREPARING = "준비"
 
+        /** 종료된 행사 — 현장등록 status 게이트(공개 경로)가 이 상태만 거부한다. */
+        const val STATUS_CLOSED = "종료"
+
         /** 신규 생성 행사의 기본 문자 정책 표기(DB 컬럼 기본값과 동일 — V1__init.sql `sms_policy` DEFAULT). */
         const val DEFAULT_SMS_POLICY = "초대 1회만 (기타 미발송)"
     }

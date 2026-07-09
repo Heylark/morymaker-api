@@ -26,6 +26,8 @@ internal class GuestPersistenceAdapter(
     override fun fetchDetailByToken(eventId: String, token: String): GuestListItem? =
         guestMapper.selectDetailByToken(eventId, token)
 
+    override fun findByToken(token: String): GuestListItem? = guestMapper.selectDetailByGlobalToken(token)
+
     override fun search(eventId: String, query: GuestSearchQuery): List<GuestListItem> =
         guestMapper.search(eventId, query)
 

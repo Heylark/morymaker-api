@@ -19,6 +19,14 @@ interface GuestPort {
     /** 체크인 by token(seatLabel 조인). 없으면 null. */
     fun fetchDetailByToken(eventId: String, token: String): GuestListItem?
 
+    /**
+     * 전역 token 조회(공개 경로 전용, seatLabel 조인) — eventId 파라미터가 없다. token은 전역
+     * UNIQUE(`uk_guest_token`)라 무인증 상태에서도 event 경계를 안전하게 넘어 단건을 특정할 수
+     * 있다(요청자가 event를 지정할 여지 자체가 없음 — token 소지가 곧 단일 guest 자연 스코프).
+     * 없으면 null.
+     */
+    fun findByToken(token: String): GuestListItem?
+
     /** 목록/검색(seatLabel 조인 + 페이징). */
     fun search(eventId: String, query: GuestSearchQuery): List<GuestListItem>
 

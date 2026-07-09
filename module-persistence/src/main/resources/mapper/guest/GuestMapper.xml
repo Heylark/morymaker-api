@@ -98,6 +98,21 @@
     </select>
 
     <!--
+        공개(비로그인) 경로 전용 — event_id 조건 없이 token 단독으로 조회한다. token은
+        uk_guest_token UNIQUE라 전역에서 최대 1건만 매칭되며, 이 쿼리 자체가 이미 인가(공개
+        경로는 행사 스코프 가드를 호출하지 않고 token capability 유효성 검증으로 대체한다)의
+        실행 지점이다.
+    -->
+    <select id="selectDetailByGlobalToken" resultMap="DetailResultMap">
+        SELECT
+            <include refid="columns"/>
+            , sg.label AS seat_label
+        FROM guest g
+        LEFT JOIN seat_group sg ON g.seat_group_id = sg.id AND sg.event_id = g.event_id
+        WHERE g.token = #{token}
+    </select>
+
+    <!--
         목록/검색(§4-1·§4-9). 취소자는 기본 제외(liveGuests — includeCancelled=false).
         q는 중간일치(name LIKE '%q%') — 02-architect §7 DB 건전성 판정: event_id 선두 조건으로
         해당 행사만 스캔하므로 VIP 수백 규모에서는 실질 영향 낮음(만 명 이상 시 재검토).
