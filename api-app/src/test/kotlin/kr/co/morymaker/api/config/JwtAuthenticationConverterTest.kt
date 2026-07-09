@@ -49,7 +49,7 @@ class JwtAuthenticationConverterTest {
 
     @Test
     fun `roles 클레임이 배열이 아닌 손상된 형태여도 예외를 던지지 않는다`() {
-        // 실측(REQ-0003 개발 중 확인): getClaimAsStringList는 배열이 아닌 값도 null 대신
+        // 실측(개발 중 확인): getClaimAsStringList는 배열이 아닌 값도 null 대신
         // 단일 원소 목록으로 감싸 반환한다. 실제 역할 문자열과 일치할 수 없는 값이 나오므로
         // 인가 체크는 자연히 거부되지만("ROLE_{...}" 등은 hasRole과 매치 불가), 여기서는
         // 최소한 예외 없이 처리가 끝난다는 사실만 확인한다(fail-closed의 "죽지 않는다" 축).

@@ -1,11 +1,14 @@
 package kr.co.morymaker.api.web
 
+import com.fasterxml.jackson.databind.exc.MismatchedInputException
 import jakarta.validation.ConstraintViolationException
+import kr.co.morymaker.api.application.security.EventAccessDeniedException
 import kr.co.morymaker.api.dto.ErrorBody
 import kr.co.morymaker.api.dto.ErrorDetail
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.http.converter.HttpMessageNotReadableException
 import org.springframework.security.access.AccessDeniedException
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
@@ -25,6 +28,14 @@ class GlobalExceptionHandler {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
+    // EventAccessDeniedException은 AccessDeniedException의 하위 타입이지만, 같은 클래스 안에 두
+    // 핸들러가 모두 있으면 Spring이 더 구체적인 타입(이 메서드)을 우선 선택한다(예외 계층 기준
+    // 최근접 매칭) — 아래 handleAccessDenied는 그 외(주로 @PreAuthorize 역할 거부)만 받는다.
+    @ExceptionHandler(EventAccessDeniedException::class)
+    fun handleEventAccessDenied(e: EventAccessDeniedException): ResponseEntity<ErrorBody> =
+        ResponseEntity.status(HttpStatus.FORBIDDEN)
+            .body(ErrorBody(ErrorDetail("EVENT_FORBIDDEN", e.message ?: "담당 행사가 아닙니다")))
+
     @ExceptionHandler(AccessDeniedException::class)
     fun handleAccessDenied(e: AccessDeniedException): ResponseEntity<ErrorBody> =
         ResponseEntity.status(HttpStatus.FORBIDDEN)
@@ -43,6 +54,17 @@ class GlobalExceptionHandler {
                     ),
                 ),
             )
+    }
+
+    // Kotlin data class 요청 바디에 non-null 필드가 JSON에서 통째로 빠지면 @Valid가 도달하기 전
+    // 역직렬화 자체가 실패한다(jackson-module-kotlin이 MismatchedInputException 계열을 던짐) —
+    // @NotBlank 같은 필드값 검증과 달리 "필드 자체가 없음"이라 걸러지지 않으면 catch-all(Exception)이
+    // 500으로 새어나간다(실측 확인 — EventCreateRequest.name 누락 케이스).
+    @ExceptionHandler(HttpMessageNotReadableException::class)
+    fun handleMessageNotReadable(e: HttpMessageNotReadableException): ResponseEntity<ErrorBody> {
+        val field = (e.cause as? MismatchedInputException)?.path?.lastOrNull()?.fieldName
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            .body(ErrorBody(ErrorDetail("VALIDATION_FAILED", "요청 본문을 확인해 주세요", field)))
     }
 
     @ExceptionHandler(ConstraintViolationException::class)
