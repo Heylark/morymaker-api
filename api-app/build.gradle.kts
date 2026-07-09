@@ -10,6 +10,9 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
+    // 요청 검증(@Valid) 시 던져지는 ConstraintViolationException·jakarta.validation-api를
+    // GlobalExceptionHandler가 참조하므로 명시 배선(컨트롤러가 없는 이번 범위에서도 컴파일에 필요).
+    implementation("org.springframework.boot:spring-boot-starter-validation")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")

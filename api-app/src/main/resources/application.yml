@@ -4,9 +4,40 @@ server:
 spring:
   application:
     name: morymaker-api
+  datasource:
+    # infra/docker-compose.yml — 로컬은 13306 외부 포트로 MariaDB 노출. auth와 같은 DB를 공유한다.
+    url: jdbc:mariadb://localhost:13306/${DB_NAME:morymaker}
+    username: root
+    password: ${DB_ROOT_PASSWORD:changeme}
+    driver-class-name: org.mariadb.jdbc.Driver
+  flyway:
+    enabled: true
+    # auth 서버가 같은 DB에 별도 이력으로 마이그레이션을 실행한다 — 기본 이력 테이블명을 그대로
+    # 쓰면 두 서비스의 버전 이력이 뒤섞여 충돌한다. 서비스별 이력 테이블로 분리.
+    table: flyway_schema_history_api
+    placeholder-replacement: false
+    locations: classpath:db/migration
+    # 이 DB에는 이미 auth 서버가 만든 테이블이 있어 Flyway가 "이력 테이블은 없는데 스키마는
+    # 비어있지 않다"고 판단해 기본값으로는 기동을 거부한다. baseline-version을 V1 이전(0)으로
+    # 잡아 baseline만 새로 세우고 V1은 정상적으로 적용되게 한다(비어있지 않음 = 이미 존재하는
+    # 다른 서비스 테이블일 뿐 이 서비스의 첫 마이그레이션 자체를 건너뛰면 안 됨).
+    baseline-on-migrate: true
+    baseline-version: 0
+
+mybatis:
+  mapper-locations: classpath*:mapper/**/*.xml
 
 management:
   endpoints:
     web:
       exposure:
         include: health
+
+morymaker:
+  auth:
+    # 발급 토큰의 iss 클레임 신뢰 앵커. 배포 환경마다 실 도메인으로 반드시 오버라이드해야 한다.
+    issuer: ${AUTH_ISSUER:http://localhost:30000}
+    jwk-set-uri: ${AUTH_ISSUER:http://localhost:30000}/oauth2/jwks
+  web:
+    # 콘솔·실행자·키오스크·방문자 4표면이 사용하는 프론트 오리진(CORS 허용 목록, 콤마 구분).
+    allowed-origins: ${ALLOWED_ORIGINS:http://localhost:3000}
