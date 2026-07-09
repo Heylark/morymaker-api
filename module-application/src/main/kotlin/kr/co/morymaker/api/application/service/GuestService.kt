@@ -216,7 +216,7 @@ internal class GuestService(
      * 엑셀 업로드 행 분류(§4-5·§4-6 공유 로직, drift 방지) — preview는 이 결과만 요약해 반환하고
      * confirm은 동일 결과로 실제 insert/update/취소를 수행한다.
      *
-     * 매칭 키(D1, ADR-IMPORT-MATCH-KEY) = (정규화 name, 정규화 phone) 완전일치. phone 없는 행은
+     * 매칭 키 = (정규화 name, 정규화 phone) 완전일치. phone 없는 행은
      * 이름 단독 매칭(동명이인 오판 위험)을 피하기 위해 항상 신규로 분류한다.
      */
     private fun classifyImportRows(eventId: String, rows: List<GuestImportRow>): ImportClassification {

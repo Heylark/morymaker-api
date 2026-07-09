@@ -4,7 +4,7 @@ import org.apache.ibatis.annotations.Mapper
 import org.apache.ibatis.annotations.Param
 
 /**
- * parking_record 테이블 매퍼 — guest 방향 최소 3쿼리만(D5, ADR-PARKING-MAP-BOUNDARY).
+ * parking_record 테이블 매퍼 — guest 방향 최소 3쿼리만(주차↔참석자 교차 최소 범위).
  *
  * 테이블 소유권 원칙(mybatis.md "보조 메서드 위치"): parking_record DML은 이 매퍼가 소유한다.
  * 전체 parking 도메인(zone·slot·출차 등)의 CRUD는 §6 REQ가 이 인터페이스에 이어 붙인다 — 지금은

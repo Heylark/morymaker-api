@@ -1,9 +1,9 @@
 package kr.co.morymaker.api.application.port.out
 
 /**
- * `parking_record` 교차 최소 SPI(D5, ADR-PARKING-MAP-BOUNDARY) — guest 방향 최소 read(plate→활성record
- * / guestId→slot) + guest_id 백필 write만. 전체 parking 도메인(§6)은 이 포트에 혼입하지 않는다
- * (다른 애그리게잇 — GuestPort와 별개 SPI로 유지).
+ * `parking_record` 교차 최소 SPI — guest 방향 최소 read(plate→활성record / guestId→slot) +
+ * guest_id 백필 write만. 전체 parking 도메인(주차 등록·출차·zone 등)은 이 포트에 혼입하지 않는다
+ * (다른 애그리게잇 — GuestPort와 별개 SPI로 유지, 후속 주차 REQ가 별도 확장).
  */
 interface ParkingLinkPort {
 

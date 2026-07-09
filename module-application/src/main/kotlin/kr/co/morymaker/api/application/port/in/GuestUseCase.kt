@@ -6,8 +6,7 @@ import kr.co.morymaker.api.domain.guest.Guest
 /**
  * 참석자 명단 유스케이스 포트-in — api-app의 `GuestController`가 호출한다(§4 명단).
  *
- * 체크인(§5)은 [CheckinUseCase]로 분리한다(인가 표면·응답 계약 상이 — 02-architect
- * ADR-CHECKIN-STRUCTURE).
+ * 체크인(§5)은 [CheckinUseCase]로 분리한다 — 인가 표면(STAFF 포함 여부)과 응답 계약이 다르다.
  */
 interface GuestUseCase {
 

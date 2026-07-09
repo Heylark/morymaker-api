@@ -13,8 +13,8 @@ import org.springframework.web.multipart.MultipartFile
  * application 레이어가 Apache POI/multipart 타입에 오염되지 않도록 파싱을 이 계층에서
  * 끝내고, 서비스에는 파싱된 값 목록만 전달한다(02-architect §10 권고).
  *
- * A-1 기본 컬럼셋(이름·소속·직함·연락처·차량번호·좌석그룹) 순서를 시트 A~F열로 가정한다 —
- * 모리메이커 실 엑셀 양식 미수령 상태의 잠정 가정(ADR-IMPORT-MATCH-KEY와 동일 전제, 실 양식
+ * 기본 컬럼셋(이름·소속·직함·연락처·차량번호·좌석그룹) 순서를 시트 A~F열로 가정한다 —
+ * 모리메이커 실 엑셀 양식 미수령 상태의 잠정 가정(import 매칭 키 결정과 동일 전제, 실 양식
  * 수령 시 함께 재검토 대상).
  */
 internal object GuestExcelParser {

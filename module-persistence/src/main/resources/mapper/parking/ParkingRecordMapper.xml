@@ -4,10 +4,10 @@
 <!--
     ParkingRecordMapper.xml — parking_record 테이블(1테이블1파일).
 
-    이번 REQ(guest 명단·체크인)는 guest 방향 최소 3쿼리만 정의한다(D5, ADR-PARKING-MAP-BOUNDARY).
-    전체 parking 도메인(zone·slot·출차·zone JOIN 등)의 columns/BaseResultMap/CRUD는 §6 REQ가
-    이 파일에 이어 붙인다 — 지금은 컬럼 목록·resultMap 자체를 아직 정의하지 않는다(scalar
-    반환만 사용하므로 필요 없다).
+    guest 명단·체크인 범위에서는 guest 방향 최소 3쿼리만 정의한다(주차↔참석자 교차 최소 범위).
+    전체 parking 도메인(zone·slot·출차·zone JOIN 등)의 columns/BaseResultMap/CRUD는 후속 주차
+    도메인 작업이 이 파일에 이어 붙인다 — 지금은 컬럼 목록·resultMap 자체를 아직 정의하지 않는다
+    (scalar 반환만 사용하므로 필요 없다).
 -->
 <mapper namespace="kr.co.morymaker.api.persistence.mapper.ParkingRecordMapper">
 

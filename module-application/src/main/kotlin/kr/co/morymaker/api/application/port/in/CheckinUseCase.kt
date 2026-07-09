@@ -6,10 +6,9 @@ import kr.co.morymaker.api.domain.guest.Guest
 /**
  * 체크인 유스케이스 포트-in(§5) — api-app의 `CheckinController`가 호출한다.
  *
- * Guest CRUD([GuestUseCase])와 분리하는 근거는 02-architect ADR-CHECKIN-STRUCTURE 참조 —
- * 인가 표면이 다르고(§5-1 SCN은 STAFF 포함) 멱등 재조회 응답 계약이 CRUD와 다르다. 동일
- * Guest 애그리게잇의 상태 전이이므로 별도 CheckinPort 없이 `GuestPort`+`ParkingLinkPort`를
- * 재사용한다.
+ * Guest CRUD([GuestUseCase])와 분리하는 근거는 인가 표면이 다르고(체크인 확정 SCN은 STAFF 포함,
+ * 명단 CRUD는 ADMIN 전용) 멱등 재조회 응답 계약이 CRUD와 다르기 때문이다. 동일 Guest
+ * 애그리게잇의 상태 전이이므로 별도 CheckinPort 없이 `GuestPort`+`ParkingLinkPort`를 재사용한다.
  */
 interface CheckinUseCase {
 

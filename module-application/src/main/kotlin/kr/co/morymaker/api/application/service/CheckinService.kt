@@ -17,11 +17,11 @@ import java.time.Instant
 /**
  * [CheckinUseCase] 구현체 — §5-1(SCN 경로만)·§5-3 상태 전이를 담당한다.
  *
- * `GuestService`와 분리하는 근거는 02-architect ADR-CHECKIN-STRUCTURE 참조(인가 표면·응답
- * 계약 상이). 동일 Guest 애그리게잇의 상태 전이이므로 별도 CheckinPort 없이 [GuestPort]와
- * [ParkingLinkPort]를 재사용한다(애그리게잇 1개·포트 2개 공유).
+ * `GuestService`와 분리하는 근거는 인가 표면(체크인 확정 SCN은 STAFF 포함, 명단 CRUD는 ADMIN
+ * 전용)과 멱등 재조회 응답 계약이 CRUD와 달라서다. 동일 Guest 애그리게잇의 상태 전이이므로
+ * 별도 CheckinPort 없이 [GuestPort]와 [ParkingLinkPort]를 재사용한다(애그리게잇 1개·포트 2개 공유).
  *
- * KIO(무인 키오스크) 경로는 D2 결정(사용자 결정 위임, CP-2 트리거 ⑥) 후 별도 태스크로
+ * 무인 키오스크(KIO) 경로는 endpoint 카테고리·토큰 정책 결정이 확정된 뒤 별도 태스크로
  * 추가한다 — 이 클래스는 인증된 실행자(STAFF/ADMIN)만 호출하는 SCN 경로만 구현한다.
  */
 @Service
