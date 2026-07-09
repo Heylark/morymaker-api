@@ -1,0 +1,31 @@
+package kr.co.morymaker.api.application.port.`in`
+
+import kr.co.morymaker.api.domain.event.Event
+
+/**
+ * 행사 유스케이스 포트-in — api-app의 `EventController`가 호출한다.
+ */
+interface EventUseCase {
+
+    /** 목록 조회 — 호출자 스코프에 따라 결과가 필터링된다(SYSTEM_ADMIN 전체 / 그 외 담당 행사만). */
+    fun listEvents(): List<Event>
+
+    /** 단건 조회 — 스코프 위반 시 [kr.co.morymaker.api.application.security.EventAccessDeniedException]. */
+    fun getEvent(eid: String): Event
+
+    /** 행사 생성 — 호출은 `HAS_SYSTEM_ADMIN` 역할 게이트를 통과한 요청만 도달한다(컨트롤러 `@PreAuthorize`). */
+    fun createEvent(command: CreateEventCommand): Event
+}
+
+/** [EventUseCase.createEvent] 입력 — `name`만 필수, 나머지는 미지정 시 브랜드 기본값 상속(02-api-spec §2-2). */
+data class CreateEventCommand(
+    val name: String,
+    val eventDate: java.time.Instant?,
+    val place: String?,
+    val type: String?,
+    val bgColor: String?,
+    val pointColor: String?,
+    val titleColor: String?,
+    val bodyColor: String?,
+    val kv: String?,
+)
