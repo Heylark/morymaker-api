@@ -13,6 +13,9 @@ dependencies {
     // 요청 검증(@Valid) 시 던져지는 ConstraintViolationException·jakarta.validation-api를
     // GlobalExceptionHandler가 참조하므로 명시 배선(컨트롤러가 없는 이번 범위에서도 컴파일에 필요).
     implementation("org.springframework.boot:spring-boot-starter-validation")
+    // 명단 엑셀 병합(§4-5·4-6) 업로드 파싱 — GuestExcelParser(컨트롤러 레이어) 전용.
+    // application 레이어에는 배선하지 않는다(POI/multipart 오염 회피 — 02-architect §10).
+    implementation("org.apache.poi:poi-ooxml:5.3.0")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")

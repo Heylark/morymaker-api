@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+    GuestMapper.xml — guest 테이블(1테이블1파일).
+
+    두 resultMap을 쓴다(02-architect §5-1 — BaseResultMap 재사용 아님, 별도 constructor):
+    - BaseResultMap(type=Guest) — 쓰기 대상 pure 도메인, 13컬럼만.
+    - DetailResultMap(type=GuestListItem) — 13컬럼 + seat_group LEFT JOIN의 seat_label.
+    두 <constructor> 모두 선언 순서가 각 클래스의 주 생성자 파라미터 순서와 정확히 일치해야
+    한다(positional index 금지 — 컬럼명 기반 명시 매핑이라 컬럼 순서 자체는 안전하지만
+    생성자 인자 개수·타입은 XML과 항상 짝을 맞춘다).
+
+    guest는 non-null Boolean 필드가 없다 — Event.active와 달리 "_boolean" 이슈 없음.
+    visit_at/created_at: DATETIME ↔ java.time.Instant(InstantTypeHandler 자동 등록, Event와 동일).
+-->
+<mapper namespace="kr.co.morymaker.api.persistence.mapper.GuestMapper">
+
+    <resultMap id="BaseResultMap" type="kr.co.morymaker.api.domain.guest.Guest">
+        <constructor>
+            <idArg column="id"            javaType="String"/>
+            <arg   column="event_id"      javaType="String"/>
+            <arg   column="name"          javaType="String"/>
+            <arg   column="org"           javaType="String"/>
+            <arg   column="title"         javaType="String"/>
+            <arg   column="phone"         javaType="String"/>
+            <arg   column="plate"         javaType="String"/>
+            <arg   column="seat_group_id" javaType="String"/>
+            <arg   column="status"        javaType="String"/>
+            <arg   column="src"           javaType="String"/>
+            <arg   column="visit_at"      javaType="java.time.Instant"/>
+            <arg   column="token"         javaType="String"/>
+            <arg   column="created_at"    javaType="java.time.Instant"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="DetailResultMap" type="kr.co.morymaker.api.application.port.out.GuestListItem">
+        <constructor>
+            <idArg column="id"            javaType="String"/>
+            <arg   column="event_id"      javaType="String"/>
+            <arg   column="name"          javaType="String"/>
+            <arg   column="org"           javaType="String"/>
+            <arg   column="title"         javaType="String"/>
+            <arg   column="phone"         javaType="String"/>
+            <arg   column="plate"         javaType="String"/>
+            <arg   column="seat_group_id" javaType="String"/>
+            <arg   column="status"        javaType="String"/>
+            <arg   column="src"           javaType="String"/>
+            <arg   column="visit_at"      javaType="java.time.Instant"/>
+            <arg   column="token"         javaType="String"/>
+            <arg   column="created_at"    javaType="java.time.Instant"/>
+            <arg   column="seat_label"    javaType="String"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="columns">
+        g.id
+        , g.event_id
+        , g.name
+        , g.org
+        , g.title
+        , g.phone
+        , g.plate
+        , g.seat_group_id
+        , g.status
+        , g.src
+        , g.visit_at
+        , g.token
+        , g.created_at
+    </sql>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT
+            <include refid="columns"/>
+        FROM guest g
+        WHERE g.event_id = #{eventId}
+          AND g.id = #{gid}
+    </select>
+
+    <select id="selectDetailById" resultMap="DetailResultMap">
+        SELECT
+            <include refid="columns"/>
+            , sg.label AS seat_label
+        FROM guest g
+        LEFT JOIN seat_group sg ON g.seat_group_id = sg.id AND sg.event_id = g.event_id
+        WHERE g.event_id = #{eventId}
+          AND g.id = #{gid}
+    </select>
+
+    <select id="selectDetailByToken" resultMap="DetailResultMap">
+        SELECT
+            <include refid="columns"/>
+            , sg.label AS seat_label
+        FROM guest g
+        LEFT JOIN seat_group sg ON g.seat_group_id = sg.id AND sg.event_id = g.event_id
+        WHERE g.event_id = #{eventId}
+          AND g.token = #{token}
+    </select>
+
+    <!--
+        목록/검색(§4-1·§4-9). 취소자는 기본 제외(liveGuests — includeCancelled=false).
+        q는 중간일치(name LIKE '%q%') — 02-architect §7 DB 건전성 판정: event_id 선두 조건으로
+        해당 행사만 스캔하므로 VIP 수백 규모에서는 실질 영향 낮음(만 명 이상 시 재검토).
+    -->
+    <select id="search" resultMap="DetailResultMap">
+        SELECT
+            <include refid="columns"/>
+            , sg.label AS seat_label
+        FROM guest g
+        LEFT JOIN seat_group sg ON g.seat_group_id = sg.id AND sg.event_id = g.event_id
+        WHERE g.event_id = #{eventId}
+        <if test="!query.includeCancelled">
+            AND g.status != '취소'
+        </if>
+        <if test="query.status != null">
+            AND g.status = #{query.status}
+        </if>
+        <if test="query.src != null">
+            AND g.src = #{query.src}
+        </if>
+        <if test="query.q != null and query.q != ''">
+            AND g.name LIKE CONCAT('%', #{query.q}, '%')
+        </if>
+        ORDER BY g.created_at DESC
+        <if test="query.paging">
+            LIMIT #{query.pageSize} OFFSET #{query.offset}
+        </if>
+    </select>
+
+    <select id="countSearch" resultType="int">
+        SELECT COUNT(*)
+        FROM guest g
+        WHERE g.event_id = #{eventId}
+        <if test="!query.includeCancelled">
+            AND g.status != '취소'
+        </if>
+        <if test="query.status != null">
+            AND g.status = #{query.status}
+        </if>
+        <if test="query.src != null">
+            AND g.src = #{query.src}
+        </if>
+        <if test="query.q != null and query.q != ''">
+            AND g.name LIKE CONCAT('%', #{query.q}, '%')
+        </if>
+    </select>
+
+    <select id="existsByToken" resultType="boolean">
+        SELECT EXISTS(SELECT 1 FROM guest WHERE token = #{token})
+    </select>
+
+    <insert id="insert" parameterType="kr.co.morymaker.api.domain.guest.Guest">
+        INSERT INTO guest (
+            id
+            , event_id
+            , name
+            , org
+            , title
+            , phone
+            , plate
+            , seat_group_id
+            , status
+            , src
+            , visit_at
+            , token
+            , created_at
+        ) VALUES (
+            #{id}
+            , #{eventId}
+            , #{name}
+            , #{org}
+            , #{title}
+            , #{phone}
+            , #{plate}
+            , #{seatGroupId}
+            , #{status}
+            , #{src}
+            , #{visitAt}
+            , #{token}
+            , #{createdAt}
+        )
+    </insert>
+
+    <!-- 전 필드 update(CRUD·상태전이 공용). token·created_at은 발급 시점 고정값이라 갱신 대상 아님. -->
+    <update id="update" parameterType="kr.co.morymaker.api.domain.guest.Guest">
+        UPDATE guest
+           SET  name          = #{name}
+              , org           = #{org}
+              , title         = #{title}
+              , phone         = #{phone}
+              , plate         = #{plate}
+              , seat_group_id = #{seatGroupId}
+              , status        = #{status}
+              , src           = #{src}
+              , visit_at      = #{visitAt}
+         WHERE id = #{id}
+           AND event_id = #{eventId}
+    </update>
+
+</mapper>
