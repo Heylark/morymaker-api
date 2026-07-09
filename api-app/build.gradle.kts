@@ -16,6 +16,10 @@ dependencies {
     // 명단 엑셀 병합(§4-5·4-6) 업로드 파싱 — GuestExcelParser(컨트롤러 레이어) 전용.
     // application 레이어에는 배선하지 않는다(POI/multipart 오염 회피 — 02-architect §10).
     implementation("org.apache.poi:poi-ooxml:5.3.0")
+    // 주차 자리 QR PNG 생성(§6-4) — QrCodeGenerator(컨트롤러 레이어) 전용.
+    // application 레이어에는 배선하지 않는다(POI 선례와 동일한 오염 회피 — 02-architect §7).
+    implementation("com.google.zxing:core:3.5.3")
+    implementation("com.google.zxing:javase:3.5.3")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")

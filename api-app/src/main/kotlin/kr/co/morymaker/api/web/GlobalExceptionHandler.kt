@@ -2,6 +2,7 @@ package kr.co.morymaker.api.web
 
 import com.fasterxml.jackson.databind.exc.MismatchedInputException
 import jakarta.validation.ConstraintViolationException
+import kr.co.morymaker.api.application.parking.SlotOccupiedException
 import kr.co.morymaker.api.application.security.EventAccessDeniedException
 import kr.co.morymaker.api.dto.ErrorBody
 import kr.co.morymaker.api.dto.ErrorDetail
@@ -78,6 +79,13 @@ class GlobalExceptionHandler {
     fun handleNotFound(e: NoSuchElementException): ResponseEntity<ErrorBody> =
         ResponseEntity.status(HttpStatus.NOT_FOUND)
             .body(ErrorBody(ErrorDetail("NOT_FOUND", e.message ?: "리소스를 찾을 수 없습니다")))
+
+    // 동시 등록 최종 방어(P5, §6-6.4) — active_key UNIQUE 위반이 서비스에서 이 도메인 예외로
+    // 번역되어 올라온다(ParkingRecordService.register). 자리 점유 확정 케이스만 좁게 매핑.
+    @ExceptionHandler(SlotOccupiedException::class)
+    fun handleSlotOccupied(e: SlotOccupiedException): ResponseEntity<ErrorBody> =
+        ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(ErrorBody(ErrorDetail("SLOT_OCCUPIED", e.message ?: "이미 사용 중인 자리입니다")))
 
     // @Valid 애노테이션이 표현할 수 없는 요청 형태 검증(예: 두 필드 중 최소 하나 필수 —
     // CheckinRequest의 token/guestId)은 컨트롤러가 직접 던지는 이 예외로 처리한다.

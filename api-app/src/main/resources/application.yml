@@ -41,3 +41,7 @@ morymaker:
   web:
     # 콘솔·실행자·키오스크·방문자 4표면이 사용하는 프론트 오리진(CORS 허용 목록, 콤마 구분).
     allowed-origins: ${ALLOWED_ORIGINS:http://localhost:3000}
+  parking:
+    # 주차 자리 QR payload 베이스(§6-4) — 자리 중립 URL(`/p/{slotCode}`)이라 운영 방식이 바뀌어도
+    # 재인쇄가 필요 없다(3-6). 배포 환경마다 실 도메인으로 오버라이드해야 한다.
+    qr-base-url: ${PARKING_QR_BASE_URL:https://park.morymaker.co.kr}
