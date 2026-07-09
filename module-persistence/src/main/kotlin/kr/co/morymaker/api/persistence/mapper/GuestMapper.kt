@@ -37,4 +37,18 @@ interface GuestMapper {
     fun insert(guest: Guest)
 
     fun update(guest: Guest)
+
+    // ➕ §6 신규 — parking→guest 매핑(3-7, P3) 조회·전이. GuestLinkAdapter가 위임(테이블 소유권 유지).
+
+    /** plate 완전일치(공백 정규화) 활성 참석자 조회 — 취소자 제외. 없으면 null. */
+    fun selectActiveByPlate(@Param("eventId") eventId: String, @Param("plate") plate: String): Guest?
+
+    /** phone 완전일치 활성 참석자 조회(plate 매칭 실패 시 보조) — 취소자 제외. 없으면 null. */
+    fun selectActiveByPhone(@Param("eventId") eventId: String, @Param("phone") phone: String): Guest?
+
+    /** 대기→방문 가드 전이(매핑 성공 시). 대기 상태가 아니면 영향 0행(가드). */
+    fun markVisitedIfWaiting(@Param("gid") gid: String)
+
+    /** plate 백필 — 기존 값이 비어 있을 때만 갱신(가드). */
+    fun backfillPlateIfEmpty(@Param("gid") gid: String, @Param("plate") plate: String)
 }

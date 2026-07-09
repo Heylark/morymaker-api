@@ -4,12 +4,27 @@
 <!--
     ParkingRecordMapper.xml — parking_record 테이블(1테이블1파일).
 
-    guest 명단·체크인 범위에서는 guest 방향 최소 3쿼리만 정의한다(주차↔참석자 교차 최소 범위).
-    전체 parking 도메인(zone·slot·출차·zone JOIN 등)의 columns/BaseResultMap/CRUD는 후속 주차
-    도메인 작업이 이 파일에 이어 붙인다 — 지금은 컬럼 목록·resultMap 자체를 아직 정의하지 않는다
-    (scalar 반환만 사용하므로 필요 없다).
+    guest 방향 최소 3쿼리(교차 최소 범위)는 파일 상단에 그대로 유지한다(❄️ 동결 — 변경 금지).
+    §6 주차 도메인 CRUD(zone·record 수직 신설)가 columns/BaseResultMap을 처음 도입하며 이어
+    붙는다.
+
+    <constructor> 선언 순서는 ParkingRecord 주 생성자 파라미터 순서와 정확히 일치해야 한다:
+    (id, eventId, zoneId, slotSig, plate, phone, vipName, guestId, registeredBy, registeredAt,
+     status, reviewNeeded). positional index 금지 — 컬럼명 기반 명시 매핑.
+
+    ⚠️ review_needed의 <constructor> javaType은 "boolean"이 아니라 "_boolean"이어야 한다.
+    ParkingRecord.reviewNeeded(Kotlin non-null Boolean)는 JVM 생성자 시그니처에서 프리미티브
+    boolean으로 컴파일되는데, MyBatis 기본 별칭 표에서 "boolean"은 래퍼 타입(java.lang.Boolean)에
+    매핑되고 프리미티브는 "_boolean" 접두사 별칭이 맡는다(EventMapper.xml active 사례와 동일 원인).
+
+    active_key(생성 컬럼)는 도메인 필드가 아니다 — BaseResultMap·insert·update 어디에도 포함하지
+    않는다(읽지도 쓰지도 않음, 02-architect §2-1 명시).
+
+    registered_at: DATETIME ↔ java.time.Instant(InstantTypeHandler 자동 등록, Guest·Event와 동일).
 -->
 <mapper namespace="kr.co.morymaker.api.persistence.mapper.ParkingRecordMapper">
+
+    <!-- ❄️ 동결 영역 — 기존 3 scalar 쿼리(guest 교차 최소 범위, 변경 금지). -->
 
     <!-- idx_precord_plate(event_id, plate) 커버. status='주차중'인 활성 기록만 매칭 대상. -->
     <select id="selectActiveRecordIdByPlate" resultType="string">
@@ -35,6 +50,154 @@
         UPDATE parking_record
            SET guest_id = #{guestId}
          WHERE id = #{recordId}
+    </update>
+
+    <!-- ➕ §6 신규 영역 — parking_record 전체 CRUD. -->
+
+    <resultMap id="BaseResultMap" type="kr.co.morymaker.api.domain.parking.ParkingRecord">
+        <constructor>
+            <idArg column="id"            javaType="String"/>
+            <arg   column="event_id"      javaType="String"/>
+            <arg   column="zone_id"       javaType="String"/>
+            <arg   column="slot_sig"      javaType="String"/>
+            <arg   column="plate"         javaType="String"/>
+            <arg   column="phone"         javaType="String"/>
+            <arg   column="vip_name"      javaType="String"/>
+            <arg   column="guest_id"      javaType="String"/>
+            <arg   column="registered_by" javaType="String"/>
+            <arg   column="registered_at" javaType="java.time.Instant"/>
+            <arg   column="status"        javaType="String"/>
+            <arg   column="review_needed" javaType="_boolean"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="columns">
+        id
+        , event_id
+        , zone_id
+        , slot_sig
+        , plate
+        , phone
+        , vip_name
+        , guest_id
+        , registered_by
+        , registered_at
+        , status
+        , review_needed
+    </sql>
+
+    <!-- P1 잠금 — 대상 자리 활성 기록을 이 트랜잭션이 끝날 때까지 잠근다(승계 직렬화). -->
+    <select id="selectActiveForUpdate" resultMap="BaseResultMap">
+        SELECT
+            <include refid="columns"/>
+        FROM parking_record
+        WHERE event_id = #{eventId}
+          AND slot_sig = #{slotSig}
+          AND status = '주차중'
+        LIMIT 1
+        FOR UPDATE
+    </select>
+
+    <select id="selectActiveByPlate" resultMap="BaseResultMap">
+        SELECT
+            <include refid="columns"/>
+        FROM parking_record
+        WHERE event_id = #{eventId}
+          AND plate = #{plate}
+          AND status = '주차중'
+        LIMIT 1
+    </select>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT
+            <include refid="columns"/>
+        FROM parking_record
+        WHERE event_id = #{eventId}
+          AND id = #{id}
+    </select>
+
+    <!--
+        목록(§6-5). plateTail은 뒷자리 4자리 계약(LIKE 접미 매칭) — idx_precord_plate(event_id,
+        plate)는 event_id equality만 인덱스 활용하고 plate 접미 검색은 event 파티션 스캔이다
+        (VIP 수백 규모 무시 가능, 02-architect §11).
+    -->
+    <select id="search" resultMap="BaseResultMap">
+        SELECT
+            <include refid="columns"/>
+        FROM parking_record
+        WHERE event_id = #{eventId}
+        <if test="query.zoneId != null">
+            AND zone_id = #{query.zoneId}
+        </if>
+        <if test="query.status != null">
+            AND status = #{query.status}
+        </if>
+        <if test="query.reviewNeeded != null">
+            AND review_needed = #{query.reviewNeeded}
+        </if>
+        <if test="query.plateTail != null and query.plateTail != ''">
+            AND plate LIKE CONCAT('%', #{query.plateTail})
+        </if>
+        ORDER BY registered_at DESC
+    </select>
+
+    <insert id="insert" parameterType="kr.co.morymaker.api.domain.parking.ParkingRecord">
+        INSERT INTO parking_record (
+            id
+            , event_id
+            , zone_id
+            , slot_sig
+            , plate
+            , phone
+            , vip_name
+            , guest_id
+            , registered_by
+            , registered_at
+            , status
+            , review_needed
+        ) VALUES (
+            #{id}
+            , #{eventId}
+            , #{zoneId}
+            , #{slotSig}
+            , #{plate}
+            , #{phone}
+            , #{vipName}
+            , #{guestId}
+            , #{registeredBy}
+            , #{registeredAt}
+            , #{status}
+            , #{reviewNeeded}
+        )
+    </insert>
+
+    <!-- 자리 이동(§4-1 케이스 C·D) — slot_sig·zone_id·review_needed·guest_id만 갱신. -->
+    <update id="updateSlotMove" parameterType="kr.co.morymaker.api.domain.parking.ParkingRecord">
+        UPDATE parking_record
+           SET  slot_sig      = #{slotSig}
+              , zone_id       = #{zoneId}
+              , review_needed = #{reviewNeeded}
+              , guest_id      = #{guestId}
+         WHERE id = #{id}
+    </update>
+
+    <!-- 본인 재등록(§4-1 케이스 A) — 위치 재표시, registered_at만 현재 시각으로 갱신. -->
+    <update id="touchRegisteredAt">
+        UPDATE parking_record
+           SET registered_at = NOW()
+         WHERE id = #{id}
+    </update>
+
+    <update id="checkout">
+        UPDATE parking_record
+           SET status = '출차'
+         WHERE id = #{id}
+    </update>
+
+    <update id="clearReview">
+        UPDATE parking_record
+           SET review_needed = 0
+         WHERE id = #{id}
     </update>
 
 </mapper>
