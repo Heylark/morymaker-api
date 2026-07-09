@@ -3,6 +3,7 @@ package kr.co.morymaker.api.web
 import com.fasterxml.jackson.databind.exc.MismatchedInputException
 import jakarta.validation.ConstraintViolationException
 import kr.co.morymaker.api.application.security.EventAccessDeniedException
+import kr.co.morymaker.api.application.service.EventNotOpenException
 import kr.co.morymaker.api.dto.ErrorBody
 import kr.co.morymaker.api.dto.ErrorDetail
 import org.slf4j.LoggerFactory
@@ -78,6 +79,18 @@ class GlobalExceptionHandler {
     fun handleNotFound(e: NoSuchElementException): ResponseEntity<ErrorBody> =
         ResponseEntity.status(HttpStatus.NOT_FOUND)
             .body(ErrorBody(ErrorDetail("NOT_FOUND", e.message ?: "리소스를 찾을 수 없습니다")))
+
+    // 현장등록 status 게이트(D5) — 종료된 행사만 이 예외 대상이다(준비·운영중은 정상 진행).
+    @ExceptionHandler(EventNotOpenException::class)
+    fun handleEventNotOpen(e: EventNotOpenException): ResponseEntity<ErrorBody> =
+        ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(ErrorBody(ErrorDetail("EVENT_CLOSED", e.message ?: "종료된 행사입니다")))
+
+    // 현장등록 공개 POST rate limit(D4) 초과 — PublicRateLimitInterceptor가 던진다.
+    @ExceptionHandler(RateLimitExceededException::class)
+    fun handleRateLimitExceeded(e: RateLimitExceededException): ResponseEntity<ErrorBody> =
+        ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+            .body(ErrorBody(ErrorDetail("RATE_LIMIT_EXCEEDED", e.message ?: "요청이 너무 많습니다")))
 
     // @Valid 애노테이션이 표현할 수 없는 요청 형태 검증(예: 두 필드 중 최소 하나 필수 —
     // CheckinRequest의 token/guestId)은 컨트롤러가 직접 던지는 이 예외로 처리한다.
