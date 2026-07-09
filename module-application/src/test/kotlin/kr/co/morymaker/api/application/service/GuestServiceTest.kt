@@ -11,28 +11,28 @@ import kr.co.morymaker.api.application.port.`in`.RegisterGuestCommand
 import kr.co.morymaker.api.application.port.`in`.UpdateGuestCommand
 import kr.co.morymaker.api.application.port.out.GuestListItem
 import kr.co.morymaker.api.application.port.out.GuestPort
-import kr.co.morymaker.api.application.port.out.ParkingLinkPort
 import kr.co.morymaker.api.application.security.EventScopeGuard
 import kr.co.morymaker.api.domain.guest.Guest
 import org.junit.jupiter.api.Test
 import java.time.Instant
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
 /**
- * [GuestService] 단위 테스트 — [GuestPort]/[ParkingLinkPort]/[EventScopeGuard]를 mock으로
- * 대체해 CRUD 오케스트레이션·주차 지연매칭(mapGuestParking)·엑셀 병합 분류 로직만 검증한다.
+ * [GuestService] 단위 테스트 — [GuestPort]/[EventScopeGuard]/[GuestWriteSupport]를 mock으로
+ * 대체해 행사 스코프 게이트 호출 순서·필드 병합·CRUD 오케스트레이션·엑셀 병합 분류 로직만
+ * 검증한다.
  *
- * 종합 격리 TC(cross-tenant)·byte-identical 회귀 TC 등은 Tester(T-009) 담당.
+ * 신규 생성·주차 지연매칭·토큰 발급의 실제 쓰기 로직은 [GuestWriteSupport]로 이동했으므로
+ * 그 세부 동작(plate 매칭 성공/실패, 토큰 충돌 재시도)은 [GuestWriteSupportTest]가 검증한다.
+ * 종합 격리 테스트(cross-tenant)·byte-identical 회귀 테스트 등은 Tester 담당.
  */
 class GuestServiceTest {
 
     private val guestPort = mockk<GuestPort>()
-    private val parkingLinkPort = mockk<ParkingLinkPort>()
     private val eventScopeGuard = mockk<EventScopeGuard>()
-    private val service = GuestService(guestPort, parkingLinkPort, eventScopeGuard, GuestTokenGenerator())
+    private val guestWriteSupport = mockk<GuestWriteSupport>()
+    private val service = GuestService(guestPort, eventScopeGuard, guestWriteSupport)
 
     private fun sampleGuest(
         id: String = "g1",
@@ -81,13 +81,13 @@ class GuestServiceTest {
         seatLabel = null,
     )
 
-    // ── registerGuest ──────────────────────────────────────────────
+    // ── registerGuest — assertAccess 선두 유지 + GuestWriteSupport 위임(동작 보존) ──────
 
     @Test
-    fun `registerGuest는 대기 상태·현장 등록 기본값으로 저장하고 plate 없으면 주차매핑을 시도하지 않는다`() {
+    fun `registerGuest는 행사 스코프 게이트를 먼저 통과한 뒤 GuestWriteSupport에 위임한다`() {
         every { eventScopeGuard.assertAccess("ev1") } returns Unit
-        every { guestPort.existsByToken(any()) } returns false
-        every { guestPort.insert(any()) } returns Unit
+        val expected = sampleGuest(status = Guest.STATUS_WAITING, name = "김진우")
+        every { guestWriteSupport.createGuest("ev1", any()) } returns expected
 
         val command = RegisterGuestCommand(
             name = "김진우", org = "모리메이커", title = "대표", phone = "010-1111-2222",
@@ -95,65 +95,9 @@ class GuestServiceTest {
         )
         val result = service.registerGuest("ev1", command)
 
-        assertEquals(Guest.STATUS_WAITING, result.status)
-        assertEquals(Guest.SRC_ONSITE, result.src)
-        assertEquals("김진우", result.name)
-        verify(exactly = 1) { guestPort.insert(any()) }
-        verify(exactly = 0) { parkingLinkPort.findActiveRecordIdByPlate(any(), any()) }
-    }
-
-    @Test
-    fun `registerGuest는 plate가 매칭되면 방문 상태로 전이하고 parking_record를 백필한다`() {
-        every { eventScopeGuard.assertAccess("ev1") } returns Unit
-        every { guestPort.existsByToken(any()) } returns false
-        every { guestPort.insert(any()) } returns Unit
-        every { parkingLinkPort.findActiveRecordIdByPlate("ev1", "123가4568") } returns "record-1"
-        every { parkingLinkPort.linkGuest("record-1", any()) } returns Unit
-        every { guestPort.update(any()) } returns Unit
-
-        val command = RegisterGuestCommand(
-            name = "박서연", org = null, title = null, phone = null,
-            plate = "123가 4568", seatGroupId = null, src = "사전",
-        )
-        val result = service.registerGuest("ev1", command)
-
-        assertEquals(Guest.STATUS_VISITED, result.status)
-        assertNotNull(result.visitAt)
-        verify(exactly = 1) { parkingLinkPort.linkGuest("record-1", result.id) }
-        verify(exactly = 1) { guestPort.update(any()) }
-    }
-
-    @Test
-    fun `registerGuest는 plate 매칭 실패 시 대기 상태를 유지하고 update를 호출하지 않는다`() {
-        every { eventScopeGuard.assertAccess("ev1") } returns Unit
-        every { guestPort.existsByToken(any()) } returns false
-        every { guestPort.insert(any()) } returns Unit
-        every { parkingLinkPort.findActiveRecordIdByPlate("ev1", any()) } returns null
-
-        val command = RegisterGuestCommand(
-            name = "이도현", org = null, title = null, phone = null,
-            plate = "999나9999", seatGroupId = null, src = null,
-        )
-        val result = service.registerGuest("ev1", command)
-
-        assertEquals(Guest.STATUS_WAITING, result.status)
-        verify(exactly = 0) { guestPort.update(any()) }
-    }
-
-    @Test
-    fun `registerGuest는 토큰 충돌 시 재생성해 유일한 토큰을 발급한다`() {
-        every { eventScopeGuard.assertAccess("ev1") } returns Unit
-        every { guestPort.existsByToken(any()) } returnsMany listOf(true, false)
-        every { guestPort.insert(any()) } returns Unit
-
-        val command = RegisterGuestCommand(
-            name = "정하은", org = null, title = null, phone = null,
-            plate = null, seatGroupId = null, src = null,
-        )
-        val result = service.registerGuest("ev1", command)
-
-        assertTrue(result.token.isNotBlank())
-        verify(exactly = 2) { guestPort.existsByToken(any()) }
+        assertEquals(expected, result)
+        verify(exactly = 1) { eventScopeGuard.assertAccess("ev1") }
+        verify(exactly = 1) { guestWriteSupport.createGuest("ev1", command) }
     }
 
     // ── updateGuest ────────────────────────────────────────────────
@@ -174,16 +118,17 @@ class GuestServiceTest {
         assertEquals("새소속", result.org)
         assertEquals("010-0000-0000", result.phone)
         verify(exactly = 1) { guestPort.update(any()) }
+        verify(exactly = 0) { guestWriteSupport.mapGuestParking(any(), any()) }
     }
 
     @Test
-    fun `updateGuest는 plate 변경 시 주차 지연매칭을 재시도한다`() {
+    fun `updateGuest는 plate 변경 시 필드를 먼저 저장한 뒤 GuestWriteSupport의 지연매칭을 재시도한다`() {
         every { eventScopeGuard.assertAccess("ev1") } returns Unit
         val existing = sampleGuest(id = "g1", plate = null, status = Guest.STATUS_WAITING)
         every { guestPort.fetchById("ev1", "g1") } returns existing
         every { guestPort.update(any()) } returns Unit
-        every { parkingLinkPort.findActiveRecordIdByPlate("ev1", "12가3456") } returns "record-2"
-        every { parkingLinkPort.linkGuest("record-2", "g1") } returns Unit
+        val matched = sampleGuest(id = "g1", plate = "12가3456", status = Guest.STATUS_VISITED)
+        every { guestWriteSupport.mapGuestParking("ev1", any()) } returns matched
 
         val command = UpdateGuestCommand(
             name = null, org = null, title = null, phone = null, plate = "12가3456", seatGroupId = null,
@@ -191,8 +136,9 @@ class GuestServiceTest {
         val result = service.updateGuest("ev1", "g1", command)
 
         assertEquals(Guest.STATUS_VISITED, result.status)
-        // 1) 필드 변경분 선저장 2) 매칭 성공 후 상태 전이 저장 — 총 2회.
-        verify(exactly = 2) { guestPort.update(any()) }
+        // 1) 필드 변경분 선저장(guestPort.update) 2) 지연매칭 위임(guestWriteSupport) — 각각 1회.
+        verify(exactly = 1) { guestPort.update(any()) }
+        verify(exactly = 1) { guestWriteSupport.mapGuestParking("ev1", any()) }
     }
 
     // ── cancelGuest ────────────────────────────────────────────────
@@ -306,16 +252,17 @@ class GuestServiceTest {
         assertEquals("existing-token", updated.captured.token)
         assertEquals(Guest.STATUS_VISITED, updated.captured.status)
         assertEquals("새소속", updated.captured.org)
+        verify(exactly = 0) { guestWriteSupport.mapGuestParking(any(), any()) }
     }
 
     @Test
-    fun `confirmImport는 업로드 명단에 없는 기존 참석자를 취소 상태로 전환하고 신규 행은 삽입한다`() {
+    fun `confirmImport는 업로드 명단에 없는 기존 참석자를 취소 상태로 전환하고 신규 행은 GuestWriteSupport로 토큰을 발급받아 삽입한다`() {
         every { eventScopeGuard.assertAccess("ev1") } returns Unit
         val existing = sampleGuestListItem(id = "g1", name = "김진우", phone = "010-1234-5678", status = Guest.STATUS_WAITING)
         every { guestPort.search("ev1", any()) } returns listOf(existing)
         val updated = slot<Guest>()
         every { guestPort.update(capture(updated)) } returns Unit
-        every { guestPort.existsByToken(any()) } returns false
+        every { guestWriteSupport.generateUniqueToken() } returns "new-token"
         every { guestPort.insert(any()) } returns Unit
 
         val rows = listOf(GuestImportRow(2, "박서연", null, null, "010-9999-0000", null, null))
@@ -325,5 +272,8 @@ class GuestServiceTest {
         assertEquals(1, result.cancelledCount)
         assertEquals(Guest.STATUS_CANCELLED, updated.captured.status)
         verify(exactly = 1) { guestPort.insert(any()) }
+        verify(exactly = 1) { guestWriteSupport.generateUniqueToken() }
+        // 신규 행의 plate가 null이라 지연매칭 위임은 발생하지 않는다.
+        verify(exactly = 0) { guestWriteSupport.mapGuestParking(any(), any()) }
     }
 }

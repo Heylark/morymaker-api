@@ -12,7 +12,6 @@ import kr.co.morymaker.api.application.port.`in`.UpdateGuestCommand
 import kr.co.morymaker.api.application.port.out.GuestListItem
 import kr.co.morymaker.api.application.port.out.GuestPort
 import kr.co.morymaker.api.application.port.out.GuestSearchQuery
-import kr.co.morymaker.api.application.port.out.ParkingLinkPort
 import kr.co.morymaker.api.application.port.out.toGuest
 import kr.co.morymaker.api.application.security.EventScopeGuard
 import kr.co.morymaker.api.domain.guest.Guest
@@ -22,7 +21,11 @@ import java.time.Instant
 import java.util.UUID
 
 /**
- * [GuestUseCase] 구현체 — 명단 CRUD(§4-1~4-4)·엑셀 병합(§4-5·4-6)·주차 지연매칭(§4-10)을 담당한다.
+ * [GuestUseCase] 구현체 — 명단 CRUD(§4-1~4-4)·엑셀 병합(§4-5·4-6)을 담당한다.
+ *
+ * 신규 생성·주차 지연매칭(§4-10)·토큰 발급의 실제 쓰기 코어는 [GuestWriteSupport]로 위임한다
+ * (공개 경로 서비스와 공유하는 SSOT). 이 클래스는 `assertAccess`(행사 스코프 게이트)를 항상
+ * 먼저 호출한 뒤에만 위임하므로 인증 경로의 동작은 리팩터 전과 byte-identical하다.
  *
  * 헥사고날 레이어: application(service). `internal`: api-app은 [GuestUseCase] 인터페이스만
  * 의존한다.
@@ -30,9 +33,8 @@ import java.util.UUID
 @Service
 internal class GuestService(
     private val guestPort: GuestPort,
-    private val parkingLinkPort: ParkingLinkPort,
     private val eventScopeGuard: EventScopeGuard,
-    private val tokenGenerator: GuestTokenGenerator,
+    private val guestWriteSupport: GuestWriteSupport,
 ) : GuestUseCase {
 
     @Transactional(readOnly = true)
@@ -69,23 +71,7 @@ internal class GuestService(
     @Transactional
     override fun registerGuest(eventId: String, command: RegisterGuestCommand): Guest {
         eventScopeGuard.assertAccess(eventId)
-        val guest = Guest(
-            id = UUID.randomUUID().toString(),
-            eventId = eventId,
-            name = command.name,
-            org = command.org,
-            title = command.title,
-            phone = command.phone,
-            plate = command.plate,
-            seatGroupId = command.seatGroupId,
-            status = Guest.STATUS_WAITING,
-            src = command.src ?: Guest.SRC_ONSITE,
-            visitAt = null,
-            token = generateUniqueToken(),
-            createdAt = Instant.now(),
-        )
-        guestPort.insert(guest)
-        return if (!guest.plate.isNullOrBlank()) mapGuestParking(eventId, guest) else guest
+        return guestWriteSupport.createGuest(eventId, command)
     }
 
     @Transactional
@@ -104,7 +90,11 @@ internal class GuestService(
         // plate가 바뀌었는데 매칭에 실패한 경우에도 나머지 필드 변경은 반드시 반영돼야 한다.
         guestPort.update(merged)
         val plateChanged = command.plate != null && command.plate != existing.plate
-        return if (plateChanged && !merged.plate.isNullOrBlank()) mapGuestParking(eventId, merged) else merged
+        return if (plateChanged && !merged.plate.isNullOrBlank()) {
+            guestWriteSupport.mapGuestParking(eventId, merged)
+        } else {
+            merged
+        }
     }
 
     @Transactional
@@ -149,11 +139,11 @@ internal class GuestService(
                 status = Guest.STATUS_WAITING,
                 src = Guest.SRC_PRE,
                 visitAt = null,
-                token = generateUniqueToken(),
+                token = guestWriteSupport.generateUniqueToken(),
                 createdAt = Instant.now(),
             )
             guestPort.insert(guest)
-            if (!guest.plate.isNullOrBlank()) mapGuestParking(eventId, guest)
+            if (!guest.plate.isNullOrBlank()) guestWriteSupport.mapGuestParking(eventId, guest)
         }
 
         classification.updatedPairs.forEach { (existing, row) ->
@@ -167,7 +157,7 @@ internal class GuestService(
             )
             guestPort.update(merged)
             val plateChanged = row.plate != null && row.plate != existing.plate
-            if (plateChanged && !merged.plate.isNullOrBlank()) mapGuestParking(eventId, merged)
+            if (plateChanged && !merged.plate.isNullOrBlank()) guestWriteSupport.mapGuestParking(eventId, merged)
         }
 
         classification.excludedGuests.forEach { guest ->
@@ -181,35 +171,6 @@ internal class GuestService(
             invalidRows = classification.invalidRows,
             tokenPreserved = true,
         )
-    }
-
-    /**
-     * 주차↔참석자 역방향 지연매칭(§4-10, D5 guest 방향 최소 범위) — plate 완전일치로 활성
-     * 주차기록을 찾아 guest_id를 백필하고, 대기 상태였다면 방문으로 전이한다.
-     *
-     * 매칭 실패(활성 기록 없음)는 정상 상태이며 아무 것도 갱신하지 않는다 — plate 없는 손님과
-     * 동일하게 취급한다.
-     */
-    private fun mapGuestParking(eventId: String, guest: Guest): Guest {
-        val plate = guest.plate
-        if (plate.isNullOrBlank()) return guest
-        val recordId = parkingLinkPort.findActiveRecordIdByPlate(eventId, normalizePlate(plate)) ?: return guest
-        parkingLinkPort.linkGuest(recordId, guest.id)
-        val updated = if (guest.status == Guest.STATUS_WAITING) {
-            guest.with(status = Guest.STATUS_VISITED, visitAt = Instant.now())
-        } else {
-            guest
-        }
-        guestPort.update(updated)
-        return updated
-    }
-
-    private fun generateUniqueToken(): String {
-        repeat(MAX_TOKEN_RETRY) {
-            val candidate = tokenGenerator.generate()
-            if (!guestPort.existsByToken(candidate)) return candidate
-        }
-        throw IllegalStateException("체크인 토큰 생성에 반복 실패했습니다")
     }
 
     /**
@@ -260,10 +221,7 @@ internal class GuestService(
     )
 
     companion object {
-        private const val MAX_TOKEN_RETRY = 5
-
         private fun normalizeName(name: String): String = name.trim()
         private fun normalizePhone(phone: String): String = phone.filter { it.isDigit() }
-        private fun normalizePlate(plate: String): String = plate.replace(" ", "").trim()
     }
 }
