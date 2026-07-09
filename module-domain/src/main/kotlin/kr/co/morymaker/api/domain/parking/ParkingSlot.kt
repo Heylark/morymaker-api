@@ -38,7 +38,7 @@ object ParkingSlot {
     }
 
     /**
-     * 자리코드(signage 식별 규약, ADR-P2) — numeral은 인쇄 절대 번호(slot_no)로 고정한다.
+     * 자리코드(signage 식별 규약) — numeral은 인쇄 절대 번호(slot_no)로 고정한다.
      * slotSig·parking_slot_title.slot_no·QR 파일명과 항상 동일 번호를 가리킨다 — 예 "z1-08".
      */
     fun slotCode(zoneId: String, slotNo: Int): String = "$zoneId-${"%02d".format(slotNo)}"

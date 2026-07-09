@@ -5,7 +5,7 @@ package kr.co.morymaker.api.application.port.out
  * (guest→parking 방향, 동결)의 대칭 신설이다 — 두 포트는 방향이 반대라 서로 침범하지 않는다.
  *
  * `GuestPort`(참석자 CRUD 전체)를 parking 서비스에 그대로 노출하지 않는 이유는 최소 SPI 원칙
- * 유지(ADR-P3) — parking이 실제로 필요한 동작 2개만 이 포트에 담는다.
+ * 유지 — parking이 실제로 필요한 동작 2개만 이 포트에 담는다.
  */
 interface GuestLinkPort {
 
