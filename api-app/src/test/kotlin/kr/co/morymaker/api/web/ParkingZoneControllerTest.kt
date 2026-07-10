@@ -182,7 +182,7 @@ class ParkingZoneControllerTest(
             .andExpect(jsonPath("$.error.code").value("ROLE_FORBIDDEN"))
     }
 
-    // ── qr-zip(§6-4a)·개별 QR(§6-4b, P4) ──────────────────────────────
+    // ── qr-zip(§6-4a, P4) ──────────────────────────────────────────────
 
     @Test
     fun `qr-zip은 자리별 PNG를 slot_no 절대번호 파일명으로 묶고 QR payload는 slotCode 자리중립 URL이다`() {
@@ -214,36 +214,6 @@ class ParkingZoneControllerTest(
 
         val decoded = decodeQr(entries["지하 2층 A구역 1.png"]!!)
         assertEquals("https://park.morymaker.co.kr/p/$zid-01", decoded)
-    }
-
-    @Test
-    fun `개별 자리 QR PNG는 slotNo에 해당하는 slotCode payload를 인코딩한다`() {
-        val eid = createEvent()
-        val zid = createZone(eid, part1 = "지하 2층", part2 = "A구역", startNo = 1, slotCount = 12)
-
-        val result = mockMvc.perform(
-            get("/api/events/$eid/parking-zones/$zid/slots/8/qr.png")
-                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
-        )
-            .andExpect(status().isOk)
-            .andReturn()
-
-        assertEquals(MediaType.IMAGE_PNG_VALUE, result.response.contentType)
-        val decoded = decodeQr(result.response.contentAsByteArray)
-        assertEquals("https://park.morymaker.co.kr/p/$zid-08", decoded)
-    }
-
-    @Test
-    fun `개별 자리 QR은 범위 밖 slotNo면 404 NOT_FOUND를 받는다`() {
-        val eid = createEvent()
-        val zid = createZone(eid, startNo = 1, slotCount = 3)
-
-        mockMvc.perform(
-            get("/api/events/$eid/parking-zones/$zid/slots/99/qr.png")
-                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
-        )
-            .andExpect(status().isNotFound)
-            .andExpect(jsonPath("$.error.code").value("NOT_FOUND"))
     }
 
     private fun decodeQr(png: ByteArray): String {
