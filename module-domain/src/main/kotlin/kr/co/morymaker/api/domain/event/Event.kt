@@ -20,6 +20,8 @@ import java.time.Instant
  * @param titleColor 제목 글자색
  * @param bodyColor 본문 글자색
  * @param kv 키비주얼 텍스트/식별자
+ * @param defaultIdleMode 행사 기본 대기화면 표시방식(`branded`/`fullbleed`) — idle_content.mode
+ *                        미지정 콘텐츠의 폴백값(§11-1)
  * @param smsPolicy 문자 정책 표기
  * @param createdAt 생성 시각
  */
@@ -36,9 +38,43 @@ class Event(
     val titleColor: String?,
     val bodyColor: String?,
     val kv: String?,
+    val defaultIdleMode: String?,
     val smsPolicy: String?,
     val createdAt: Instant,
 ) {
+
+    /**
+     * §2-4 일반 필드 병합 — 컬러4종·defaultIdleMode 파라미터 자체가 없다. 저장 게이트를
+     * 도메인 계층에서도 구조적으로 보강한다(update SQL 물리 분리와 함께 3중 방어 — ADR-001).
+     */
+    fun withGeneral(
+        name: String = this.name,
+        eventDate: Instant? = this.eventDate,
+        place: String? = this.place,
+        type: String? = this.type,
+        kv: String? = this.kv,
+        status: String = this.status,
+        active: Boolean = this.active,
+    ): Event = Event(
+        id, name, eventDate, place, type, status, active,
+        bgColor, pointColor, titleColor, bodyColor, kv, defaultIdleMode, smsPolicy, createdAt,
+    )
+
+    /**
+     * §11-1 브랜딩 명시 저장 게이트 병합 — 컬러4종·kv·defaultIdleMode만 갱신한다. 일반 필드
+     * (name/eventDate/place/type/status/active)는 이 헬퍼로 변경할 수 없다(ADR-001).
+     */
+    fun withBranding(
+        bgColor: String? = this.bgColor,
+        pointColor: String? = this.pointColor,
+        titleColor: String? = this.titleColor,
+        bodyColor: String? = this.bodyColor,
+        kv: String? = this.kv,
+        defaultIdleMode: String? = this.defaultIdleMode,
+    ): Event = Event(
+        id, name, eventDate, place, type, status, active,
+        bgColor, pointColor, titleColor, bodyColor, kv, defaultIdleMode, smsPolicy, createdAt,
+    )
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
