@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+    SeatGroupMapper.xml — seat_group 테이블(1테이블1파일, §12 신설).
+
+    <constructor> 선언 순서는 SeatGroup 주 생성자 파라미터 순서와 정확히 일치해야 한다:
+    (id, eventId, groupNo, label, numbering, sortOrder). positional index(번호로 컬럼을 꺼내는
+    방식) 금지 — 컬럼명 기반 명시 매핑(GuestMapper·ParkingZoneMapper와 동일 원칙).
+
+    ⚠️ group_no/sort_order(INT→non-null Int)는 "_int", numbering(TINYINT→non-null Boolean)은
+    "_boolean" — 둘 다 Kotlin 생성자 시그니처에서 JVM 프리미티브로 컴파일되는데 MyBatis 기본
+    별칭 표에서 "int"/"boolean"은 래퍼 타입(Integer/Boolean)에 매핑되고 프리미티브는 각각
+    "_int"/"_boolean" 접두사 별칭이 맡는다(EventMapper.xml active·ParkingZoneMapper.xml
+    start_no/slot_count와 동일 원인).
+-->
+<mapper namespace="kr.co.morymaker.api.persistence.mapper.SeatGroupMapper">
+
+    <resultMap id="BaseResultMap" type="kr.co.morymaker.api.domain.seat.SeatGroup">
+        <constructor>
+            <idArg column="id"         javaType="String"/>
+            <arg   column="event_id"   javaType="String"/>
+            <arg   column="group_no"   javaType="_int"/>
+            <arg   column="label"      javaType="String"/>
+            <arg   column="numbering"  javaType="_boolean"/>
+            <arg   column="sort_order" javaType="_int"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="columns">
+        id
+        , event_id
+        , group_no
+        , label
+        , numbering
+        , sort_order
+    </sql>
+
+    <select id="findByEvent" resultMap="BaseResultMap">
+        SELECT
+            <include refid="columns"/>
+        FROM seat_group
+        WHERE event_id = #{eventId}
+        ORDER BY sort_order ASC, group_no ASC
+    </select>
+
+    <select id="fetchById" resultMap="BaseResultMap">
+        SELECT
+            <include refid="columns"/>
+        FROM seat_group
+        WHERE event_id = #{eventId}
+          AND id = #{id}
+    </select>
+
+    <select id="fetchByGroupNo" resultMap="BaseResultMap">
+        SELECT
+            <include refid="columns"/>
+        FROM seat_group
+        WHERE event_id = #{eventId}
+          AND group_no = #{groupNo}
+    </select>
+
+    <select id="nextGroupNo" resultType="int">
+        SELECT COALESCE(MAX(group_no), 0) + 1
+        FROM seat_group
+        WHERE event_id = #{eventId}
+    </select>
+
+    <select id="nextSortOrder" resultType="int">
+        SELECT COALESCE(MAX(sort_order), 0) + 1
+        FROM seat_group
+        WHERE event_id = #{eventId}
+    </select>
+
+    <insert id="insert" parameterType="kr.co.morymaker.api.domain.seat.SeatGroup">
+        INSERT INTO seat_group (
+            id
+            , event_id
+            , group_no
+            , label
+            , numbering
+            , sort_order
+        ) VALUES (
+            #{id}
+            , #{eventId}
+            , #{groupNo}
+            , #{label}
+            , #{numbering}
+            , #{sortOrder}
+        )
+    </insert>
+
+    <!-- group_no·sort_order는 등록 시 고정 — 수정 대상 아님(§12-3, SeatGroup.with()가 label·numbering만 노출). -->
+    <update id="update" parameterType="kr.co.morymaker.api.domain.seat.SeatGroup">
+        UPDATE seat_group
+           SET  label     = #{label}
+              , numbering = #{numbering}
+         WHERE id = #{id}
+           AND event_id = #{eventId}
+    </update>
+
+    <!-- fk_seatassign_group(ON DELETE CASCADE)·fk_guest_seat_group(ON DELETE SET NULL)이 종속 데이터를 자동 정리한다. -->
+    <delete id="delete">
+        DELETE FROM seat_group
+         WHERE event_id = #{eventId}
+           AND id = #{id}
+    </delete>
+
+</mapper>
