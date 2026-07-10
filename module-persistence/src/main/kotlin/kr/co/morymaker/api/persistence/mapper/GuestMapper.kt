@@ -54,4 +54,12 @@ interface GuestMapper {
 
     /** plate 백필 — 기존 값이 비어 있을 때만 갱신(가드). */
     fun backfillPlateIfEmpty(@Param("gid") gid: String, @Param("plate") plate: String)
+
+    // ➕ §12 신규 — seat→guest 매핑(M1 payload 검증·M3 동기화). GuestSeatLinkAdapter가 위임(테이블 소유권 유지).
+
+    /** event 소속 guestId만 필터링(§12-5 M1 payload 검증). */
+    fun selectExistingIds(@Param("eventId") eventId: String, @Param("guestIds") guestIds: List<String>): List<String>
+
+    /** guest.seat_group_id 일괄 갱신(§12-5 M3 동기화). seatGroupId=null이면 해제. */
+    fun updateSeatGroupId(@Param("guestIds") guestIds: List<String>, @Param("seatGroupId") seatGroupId: String?)
 }
