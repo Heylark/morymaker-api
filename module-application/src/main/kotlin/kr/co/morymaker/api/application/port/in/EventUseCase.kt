@@ -19,7 +19,7 @@ interface EventUseCase {
 
     /**
      * 행사 정보·상태 수정(§2-4). 브랜딩 컬러 4종·defaultIdleMode는 이 경로로 저장되지 않는다
-     * ([updateBranding] 전용 — ADM-04 명시 저장 게이트 우회 방지, ADR-001).
+     * ([updateBranding] 전용 — ADM-04 명시 저장 게이트 우회 방지).
      */
     fun updateEvent(eid: String, command: UpdateEventCommand): Event
 
@@ -40,7 +40,7 @@ data class CreateEventCommand(
     val kv: String?,
 )
 
-/** [EventUseCase.updateEvent] 입력(§2-4). 컬러 필드가 없다 — 저장 게이트(ADR-001). */
+/** [EventUseCase.updateEvent] 입력(§2-4). 컬러 필드가 없다 — 저장 게이트. */
 data class UpdateEventCommand(
     val name: String,
     val eventDate: Instant?,

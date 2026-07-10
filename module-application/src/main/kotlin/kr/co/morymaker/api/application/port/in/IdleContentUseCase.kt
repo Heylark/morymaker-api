@@ -3,7 +3,7 @@ package kr.co.morymaker.api.application.port.`in`
 /**
  * 대기화면 콘텐츠 관리자 유스케이스 포트-in(§11-2~4) — api-app의 `IdleContentController`가
  * 호출한다. 전 메서드 `EventScopeGuard.assertAccess` 재검증(Layer2b) — 무인증 키오스크 조회는
- * [PublicIdleContentUseCase]가 별도로 담당한다(ADR-003, 무인증 표면 분리).
+ * [PublicIdleContentUseCase]가 별도로 담당한다(무인증 표면 분리).
  */
 interface IdleContentUseCase {
 

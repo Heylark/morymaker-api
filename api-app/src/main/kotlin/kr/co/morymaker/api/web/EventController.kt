@@ -31,7 +31,7 @@ import org.springframework.web.bind.annotation.RestController
  * `EventService`의 각 메서드(Layer2b)가 한 번 더 재검증한다 — 이 클래스는 스코프 판단을 직접
  * 하지 않는다.
  *
- * `update`(§2-4)와 `updateBranding`(§11-1)은 물리적으로 다른 컬럼셋만 저장한다(ADR-001) —
+ * `update`(§2-4)와 `updateBranding`(§11-1)은 물리적으로 다른 컬럼셋만 저장한다 —
  * `EventUpdateRequest`엔 컬러 필드 자체가 없어 브랜딩이 이 경로로 새는 것이 구조적으로 불가능하다.
  */
 @RestController

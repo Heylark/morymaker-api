@@ -21,7 +21,7 @@ interface EventPort {
     /** 신규 행사 저장. */
     fun insert(event: Event)
 
-    /** 일반 필드 갱신(§2-4) — name/event_date/place/type/kv/status/active만 SET한다(컬러·defaultIdleMode 미포함, ADR-001). */
+    /** 일반 필드 갱신(§2-4) — name/event_date/place/type/kv/status/active만 SET한다(컬러·defaultIdleMode 미포함). */
     fun update(event: Event)
 
     /** 브랜딩 갱신(§11-1) — bg/point/title/body_color·kv·default_idle_mode만 SET한다. */

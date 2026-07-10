@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component
  * 계약 후 이 어댑터만 교체한다(§11-3 범위 외 이연 — 사용자 확정).
  *
  * 헥사고날 레이어: api-app(adapter) — `SmsSenderStubAdapter`와 동일하게 비-DB `@Component`로
- * 배치한다(단일 스텁을 위한 신규 패키지 신설은 과잉 구조 — ADR-002). `internal`: application
+ * 배치한다(단일 스텁을 위한 신규 패키지 신설은 과잉 구조). `internal`: application
  * 계층은 [FileStoragePort] 인터페이스만 의존한다.
  */
 @Component

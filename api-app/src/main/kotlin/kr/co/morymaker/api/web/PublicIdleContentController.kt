@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
 /**
- * 대기화면 콘텐츠 키오스크 공개 조회 API(§11-2, M3 — ADR-003) — 무인증. `SecurityConfig`의
+ * 대기화면 콘텐츠 키오스크 공개 조회 API(§11-2, M3) — 무인증. `SecurityConfig`의
  * `/api/public` 하위 전체 permitAll 규칙이 인증을 면제하며, 이 컨트롤러는 `@PreAuthorize`를
  * 두지 않는다(역할 게이트 대상 자체가 아니다 — `PublicOnsiteController`·`PublicHubController`와
  * 동일 원칙).
@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController
  *
  * 존재하지 않는 eid도 404가 아니라 빈 배열(200, fail-open)로 응답한다 — 무인증 디스플레이
  * 기기에 오류 처리를 요구하지 않기 위함이며, UUID eid + 기존 공개 폼이 이미 event 존재를
- * 노출하므로 enumeration 신규 노출도 없다(ADR-003).
+ * 노출하므로 enumeration 신규 노출도 없다.
  */
 @RestController
 @RequestMapping("/api/public/events/{eid}/idle-contents")

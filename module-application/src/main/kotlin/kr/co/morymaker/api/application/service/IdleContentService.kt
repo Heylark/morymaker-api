@@ -19,7 +19,7 @@ import java.util.UUID
  * 공개 조회(§11-2, M3)를 한 클래스가 함께 담당한다.
  *
  * 관리자 메서드([list]/[create]/[update])만 `EventScopeGuard.assertAccess`를 호출한다.
- * [listForKiosk]는 무인증 표면 전용이라 스코프 게이트를 호출하지 않는다(ADR-003) — 격리는
+ * [listForKiosk]는 무인증 표면 전용이라 스코프 게이트를 호출하지 않는다 — 격리는
  * `IdleContentPort.findByEvent`의 `event_id` WHERE 필터로만 제공한다.
  *
  * 헥사고날 레이어: application(service). `internal`: api-app은 [IdleContentUseCase]/
@@ -68,7 +68,7 @@ internal class IdleContentService(
         return merged.toView()
     }
 
-    // 키오스크 공개 조회(§11-2, M3) — assertAccess 없음(무인증 설계, ADR-003). 존재하지 않는
+    // 키오스크 공개 조회(§11-2, M3) — assertAccess 없음(무인증 설계). 존재하지 않는
     // eventId는 findByEvent가 자연히 빈 리스트를 반환한다(fail-open, 404 아님).
     @Transactional(readOnly = true)
     override fun listForKiosk(eventId: String): List<IdleContentView> =

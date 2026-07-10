@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional
 import java.nio.charset.StandardCharsets
 
 /**
- * 대기화면 콘텐츠 키오스크 공개 조회 API(§11-2, M3 — ADR-003) 통합 테스트 — 무인증 접근·
+ * 대기화면 콘텐츠 키오스크 공개 조회 API(§11-2, M3) 통합 테스트 — 무인증 접근·
  * event_id 필터 격리·존재하지 않는 eid의 fail-open(빈 배열, 404 아님)을 실 MariaDB로 검증한다.
  */
 @SpringBootTest

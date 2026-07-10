@@ -1,7 +1,7 @@
 package kr.co.morymaker.api.application.port.`in`
 
 /**
- * 대기화면 콘텐츠 키오스크 공개 조회 유스케이스 포트-in(§11-2, M3 — ADR-003) — api-app의
+ * 대기화면 콘텐츠 키오스크 공개 조회 유스케이스 포트-in(§11-2, M3) — api-app의
  * `PublicIdleContentController`가 호출한다.
  *
  * 무인증 공개 경로다 — `EventScopeGuard.assertAccess`를 호출하지 않는다([PublicOnsiteUseCase]·

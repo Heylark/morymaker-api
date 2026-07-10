@@ -45,7 +45,7 @@ class Event(
 
     /**
      * §2-4 일반 필드 병합 — 컬러4종·defaultIdleMode 파라미터 자체가 없다. 저장 게이트를
-     * 도메인 계층에서도 구조적으로 보강한다(update SQL 물리 분리와 함께 3중 방어 — ADR-001).
+     * 도메인 계층에서도 구조적으로 보강한다(update SQL 물리 분리와 함께 3중 방어).
      */
     fun withGeneral(
         name: String = this.name,
@@ -62,7 +62,7 @@ class Event(
 
     /**
      * §11-1 브랜딩 명시 저장 게이트 병합 — 컬러4종·kv·defaultIdleMode만 갱신한다. 일반 필드
-     * (name/eventDate/place/type/status/active)는 이 헬퍼로 변경할 수 없다(ADR-001).
+     * (name/eventDate/place/type/status/active)는 이 헬퍼로 변경할 수 없다.
      */
     fun withBranding(
         bgColor: String? = this.bgColor,

@@ -12,7 +12,7 @@ import org.apache.ibatis.annotations.Param
  *
  * XML 정의: resources/mapper/event/EventMapper.xml
  *
- * update/updateBranding 2종은 물리적으로 다른 컬럼셋만 SET한다(ADR-001 저장 게이트 분리) —
+ * update/updateBranding 2종은 물리적으로 다른 컬럼셋만 SET한다(저장 게이트 분리) —
  * update는 컬러4종·default_idle_mode 컬럼 자체가 SQL에 존재하지 않는다.
  */
 @Mapper

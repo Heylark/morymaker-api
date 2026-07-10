@@ -151,7 +151,7 @@ class EventServiceTest {
         assertEquals("수정된 행사명", result.name)
         assertEquals("새 장소", result.place)
         assertEquals("새 KV", result.kv)
-        // 브랜딩 필드는 §2-4 UpdateEventCommand에 필드 자체가 없어 기존 값이 그대로 유지된다(ADR-001 게이트).
+        // 브랜딩 필드는 §2-4 UpdateEventCommand에 필드 자체가 없어 기존 값이 그대로 유지된다(저장 게이트).
         assertEquals("#0c1322", result.bgColor)
         assertEquals("#c9a24a", result.pointColor)
         assertEquals("#ffffff", result.titleColor)

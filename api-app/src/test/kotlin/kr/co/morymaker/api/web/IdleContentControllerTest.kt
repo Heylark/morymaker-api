@@ -22,7 +22,7 @@ import java.nio.charset.StandardCharsets
 /**
  * 대기화면 콘텐츠 관리자 API(§11-2~4) 통합 테스트 — CRUD·메타 전용 등록(M2, fileUrl 항상 null)·
  * cross-tenant 격리를 실 MariaDB로 검증한다. 키오스크 무인증 조회는 `PublicIdleContentControllerTest`
- * 별도(ADR-003, 무인증 표면 분리).
+ * 별도(무인증 표면 분리).
  */
 @SpringBootTest
 @AutoConfigureMockMvc
