@@ -2,9 +2,10 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <!--
-    SmsLogMapper.xml — sms_log 테이블(1테이블1파일, §7 신설). guest JOIN 금지(동결 준수,
-    02-architect M5) — 게이트 alreadySent 판정은 서비스 레이어 집합연산(GuestPort.search 결과 +
-    이 매퍼의 selectSentGuestIds 결과의 멤버십 비교)으로 조립한다.
+    SmsLogMapper.xml — sms_log 테이블(1테이블1파일, §7 신설). guest 테이블과 JOIN하지 않는다
+    (기존 guest 도메인 매퍼를 건드리지 않고 동결을 지키기 위함) — 게이트 alreadySent 판정은
+    서비스 레이어 집합연산(GuestPort.search 결과 + 이 매퍼의 selectSentGuestIds 결과의 멤버십
+    비교)으로 조립한다.
 
     _int 대상 컬럼 없음 — 전부 String/Instant(sent_at은 InstantTypeHandler 자동 등록, Guest·Event
     선례와 동일해 별도 함정 없음). deleteByGuest는 하드 삭제(소프트 삭제 컬럼 없음 — §4-4 명시
