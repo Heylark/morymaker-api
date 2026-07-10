@@ -12,6 +12,7 @@ import kr.co.morymaker.api.application.port.`in`.UpdateGuestCommand
 import kr.co.morymaker.api.application.port.out.GuestListItem
 import kr.co.morymaker.api.application.port.out.GuestPort
 import kr.co.morymaker.api.application.port.out.GuestSearchQuery
+import kr.co.morymaker.api.application.port.out.SmsLogPort
 import kr.co.morymaker.api.application.port.out.toGuest
 import kr.co.morymaker.api.application.security.EventScopeGuard
 import kr.co.morymaker.api.domain.guest.Guest
@@ -35,6 +36,7 @@ internal class GuestService(
     private val guestPort: GuestPort,
     private val eventScopeGuard: EventScopeGuard,
     private val guestWriteSupport: GuestWriteSupport,
+    private val smsLogPort: SmsLogPort,
 ) : GuestUseCase {
 
     @Transactional(readOnly = true)
@@ -103,9 +105,9 @@ internal class GuestService(
         val existing = guestPort.fetchById(eventId, gid) ?: throw NoSuchElementException("참석자를 찾을 수 없습니다")
         val cancelled = existing.with(status = Guest.STATUS_CANCELLED)
         guestPort.update(cancelled)
-        // deleteSmsLog=true 케이스의 sms_log 동반 삭제는 문자 도메인이 아직 이 서버에 없어(§7
-        // 후속 REQ) 이번 범위에서는 파라미터만 수용하고 실제 삭제는 수행하지 않는다 — 참석자
-        // 취소 처리 자체는 그대로 완료된다.
+        // deleteSmsLog=false(디폴트)면 이 호출 자체가 없다 — 참석자 취소 처리만 수행하고
+        // 발송 이력은 그대로 보존한다. true일 때만 같은 트랜잭션 안에서 함께 삭제한다.
+        if (deleteSmsLog) smsLogPort.deleteByGuest(eventId, gid)
         return cancelled
     }
 
