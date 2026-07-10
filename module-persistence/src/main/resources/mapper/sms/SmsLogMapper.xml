@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+    SmsLogMapper.xml — sms_log 테이블(1테이블1파일, §7 신설). guest JOIN 금지(동결 준수,
+    02-architect M5) — 게이트 alreadySent 판정은 서비스 레이어 집합연산(GuestPort.search 결과 +
+    이 매퍼의 selectSentGuestIds 결과의 멤버십 비교)으로 조립한다.
+
+    _int 대상 컬럼 없음 — 전부 String/Instant(sent_at은 InstantTypeHandler 자동 등록, Guest·Event
+    선례와 동일해 별도 함정 없음). deleteByGuest는 하드 삭제(소프트 삭제 컬럼 없음 — §4-4 명시
+    삭제, event_id AND guest_id 둘 다 조건이라 타 행사 오삭제 불가).
+-->
+<mapper namespace="kr.co.morymaker.api.persistence.mapper.SmsLogMapper">
+
+    <resultMap id="BaseResultMap" type="kr.co.morymaker.api.domain.sms.SmsLog">
+        <constructor>
+            <idArg column="id"            javaType="String"/>
+            <arg   column="event_id"      javaType="String"/>
+            <arg   column="guest_id"      javaType="String"/>
+            <arg   column="name_snapshot" javaType="String"/>
+            <arg   column="phone"         javaType="String"/>
+            <arg   column="sent_at"       javaType="java.time.Instant"/>
+            <arg   column="status"        javaType="String"/>
+            <arg   column="body_snapshot" javaType="String"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="columns">
+        id
+        , event_id
+        , guest_id
+        , name_snapshot
+        , phone
+        , sent_at
+        , status
+        , body_snapshot
+    </sql>
+
+    <insert id="insert" parameterType="kr.co.morymaker.api.domain.sms.SmsLog">
+        INSERT INTO sms_log (
+            id
+            , event_id
+            , guest_id
+            , name_snapshot
+            , phone
+            , sent_at
+            , status
+            , body_snapshot
+        ) VALUES (
+            #{id}
+            , #{eventId}
+            , #{guestId}
+            , #{nameSnapshot}
+            , #{phone}
+            , #{sentAt}
+            , #{status}
+            , #{bodySnapshot}
+        )
+    </insert>
+
+    <select id="selectSentGuestIds" resultType="string">
+        SELECT DISTINCT guest_id
+        FROM sms_log
+        WHERE event_id = #{eventId}
+          AND guest_id IS NOT NULL
+    </select>
+
+    <select id="selectByEvent" resultMap="BaseResultMap">
+        SELECT
+            <include refid="columns"/>
+        FROM sms_log
+        WHERE event_id = #{eventId}
+        ORDER BY sent_at DESC
+    </select>
+
+    <!-- 참석자 취소 연동 삭제(§4-4 회수) — hard delete(sms_log 소프트삭제 컬럼 없음). -->
+    <delete id="deleteByGuest">
+        DELETE FROM sms_log
+        WHERE event_id = #{eventId}
+          AND guest_id = #{guestId}
+    </delete>
+
+</mapper>

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+    SmsTemplateMapper.xml — sms_template 테이블(1테이블1파일, §7 신설). 행사당 단일 본문
+    (event_id UNIQUE uk_smstmpl_event) — upsert는 표준 insert 대신 ON DUPLICATE KEY UPDATE
+    전략을 쓴다(mybatis-advanced.md upsert 예외 — 멱등 삽입, TOCTOU 없음).
+
+    _int 대상 컬럼 없음 — 전부 String/Instant(updated_at은 InstantTypeHandler 자동 등록,
+    Guest·Event 선례와 동일해 별도 함정 없음).
+-->
+<mapper namespace="kr.co.morymaker.api.persistence.mapper.SmsTemplateMapper">
+
+    <resultMap id="BaseResultMap" type="kr.co.morymaker.api.domain.sms.SmsTemplate">
+        <constructor>
+            <idArg column="id"         javaType="String"/>
+            <arg   column="event_id"   javaType="String"/>
+            <arg   column="body"       javaType="String"/>
+            <arg   column="updated_at" javaType="java.time.Instant"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="columns">
+        id
+        , event_id
+        , body
+        , updated_at
+    </sql>
+
+    <select id="fetchByEvent" resultMap="BaseResultMap">
+        SELECT
+            <include refid="columns"/>
+        FROM sms_template
+        WHERE event_id = #{eventId}
+    </select>
+
+    <!-- upsert 예외(mybatis-advanced.md) — event_id UNIQUE(uk_smstmpl_event) ON DUPLICATE KEY UPDATE.
+         충돌(기존 행) 시 id는 보존(신규 UUID는 무시)되고 body·updated_at만 갱신된다. -->
+    <insert id="upsert" parameterType="kr.co.morymaker.api.domain.sms.SmsTemplate">
+        INSERT INTO sms_template (id, event_id, body)
+        VALUES (#{id}, #{eventId}, #{body})
+        ON DUPLICATE KEY UPDATE body = VALUES(body), updated_at = CURRENT_TIMESTAMP
+    </insert>
+
+</mapper>
