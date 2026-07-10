@@ -27,10 +27,9 @@ import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
 /**
- * 주차 구획 API(§6-1~6-4) — 전 메서드 `EVENT_ADMIN`(관리자 콘솔, 실행자 제외).
+ * 주차 구획 API — 목록·등록·수정·자리 QR ZIP 일괄 다운로드. 전 메서드 `EVENT_ADMIN`(관리자 콘솔, 실행자 제외).
  *
  * `{eid}` 경로변수명은 고정 — `EventScopeInterceptor`가 "eid" 키만 검사한다(00-research 발견 3).
- * `{slotNo}`는 인쇄 절대 번호(P2 slotCode numeral과 동일 규약 — 02-architect §3-1).
  */
 @RestController
 @RequestMapping("/api/events/{eid}/parking-zones")
@@ -98,20 +97,5 @@ class ParkingZoneController(
             .contentType(MediaType.parseMediaType("application/zip"))
             .header("Content-Disposition", "attachment; filename*=UTF-8''$encodedName")
             .body(zipBytes)
-    }
-
-    /** 개별 자리 QR PNG(§6-4b) — 목록 재계산을 재사용해 slotNo에 맞는 자리만 인코딩한다. */
-    @GetMapping("/{zid}/slots/{slotNo}/qr.png")
-    @PreAuthorize(MoryRoles.HAS_ADMIN_CONSOLE)
-    fun slotQr(
-        @PathVariable eid: String,
-        @PathVariable zid: String,
-        @PathVariable slotNo: Int,
-    ): ResponseEntity<ByteArray> {
-        val bundle = zoneUseCase.getSlotsForQr(eid, zid)
-        val slot = bundle.slots.firstOrNull { it.slotNo == slotNo }
-            ?: throw NoSuchElementException("자리를 찾을 수 없습니다")
-        val png = QrCodeGenerator.encode("$qrBaseUrl/p/${slot.slotCode}")
-        return ResponseEntity.ok().contentType(MediaType.IMAGE_PNG).body(png)
     }
 }
