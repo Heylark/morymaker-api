@@ -12,8 +12,8 @@ import org.apache.ibatis.annotations.Param
  *
  * XML 정의: resources/mapper/event/EventMapper.xml
  *
- * 이번 REQ 범위(foundation)는 목록·단건 조회·생성 3개 엔드포인트만 — update/delete는 후속 도메인
- * REQ(행사 정보 수정 ADM-02, 브랜딩 ADM-04)에서 추가한다.
+ * update/updateBranding 2종은 물리적으로 다른 컬럼셋만 SET한다(저장 게이트 분리) —
+ * update는 컬러4종·default_idle_mode 컬럼 자체가 SQL에 존재하지 않는다.
  */
 @Mapper
 interface EventMapper {
@@ -26,4 +26,10 @@ interface EventMapper {
     fun search(@Param("eventIds") eventIds: List<String>?): List<Event>
 
     fun insert(event: Event)
+
+    /** 일반 필드 갱신(§2-4) — name/event_date/place/type/kv/status/active만. */
+    fun update(event: Event)
+
+    /** 브랜딩 갱신(§11-1) — bg/point/title/body_color·kv·default_idle_mode만. */
+    fun updateBranding(event: Event)
 }

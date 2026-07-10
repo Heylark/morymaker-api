@@ -25,7 +25,7 @@ class SmsRendererTest {
     ) = Event(
         id = "ev1", name = name, eventDate = eventDate, place = place, type = null,
         status = "준비", active = false, bgColor = null, pointColor = null, titleColor = null,
-        bodyColor = null, kv = null, smsPolicy = null, createdAt = Instant.now(),
+        bodyColor = null, kv = null, defaultIdleMode = null, smsPolicy = null, createdAt = Instant.now(),
     )
 
     @Test

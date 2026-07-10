@@ -21,6 +21,7 @@ data class EventResponse(
     val titleColor: String?,
     val bodyColor: String?,
     val kv: String?,
+    val defaultIdleMode: String?,
     val smsPolicy: String?,
 )
 
@@ -37,5 +38,6 @@ fun Event.toResponse(): EventResponse = EventResponse(
     titleColor = titleColor,
     bodyColor = bodyColor,
     kv = kv,
+    defaultIdleMode = defaultIdleMode,
     smsPolicy = smsPolicy,
 )

@@ -2,6 +2,8 @@ package kr.co.morymaker.api.application.service
 
 import kr.co.morymaker.api.application.port.`in`.CreateEventCommand
 import kr.co.morymaker.api.application.port.`in`.EventUseCase
+import kr.co.morymaker.api.application.port.`in`.UpdateBrandingCommand
+import kr.co.morymaker.api.application.port.`in`.UpdateEventCommand
 import kr.co.morymaker.api.application.port.out.EventPort
 import kr.co.morymaker.api.application.security.EventScopeGuard
 import kr.co.morymaker.api.domain.event.Event
@@ -51,10 +53,44 @@ internal class EventService(
             titleColor = command.titleColor,
             bodyColor = command.bodyColor,
             kv = command.kv,
+            defaultIdleMode = null,
             smsPolicy = Event.DEFAULT_SMS_POLICY,
             createdAt = Instant.now(),
         )
         eventPort.insert(event)
         return event
+    }
+
+    @Transactional
+    override fun updateEvent(eid: String, command: UpdateEventCommand): Event {
+        eventScopeGuard.assertAccess(eid)
+        val existing = eventPort.fetch(eid) ?: throw NoSuchElementException("행사를 찾을 수 없습니다")
+        val merged = existing.withGeneral(
+            name = command.name,
+            eventDate = command.eventDate,
+            place = command.place,
+            type = command.type,
+            kv = command.kv,
+            status = command.status,
+            active = command.active,
+        )
+        eventPort.update(merged)
+        return merged
+    }
+
+    @Transactional
+    override fun updateBranding(eid: String, command: UpdateBrandingCommand): Event {
+        eventScopeGuard.assertAccess(eid)
+        val existing = eventPort.fetch(eid) ?: throw NoSuchElementException("행사를 찾을 수 없습니다")
+        val merged = existing.withBranding(
+            bgColor = command.bgColor,
+            pointColor = command.pointColor,
+            titleColor = command.titleColor,
+            bodyColor = command.bodyColor,
+            kv = command.kv,
+            defaultIdleMode = command.defaultIdleMode,
+        )
+        eventPort.updateBranding(merged)
+        return merged
     }
 }

@@ -21,4 +21,8 @@ internal class EventPersistenceAdapter(
     override fun search(eventIds: List<String>?): List<Event> = eventMapper.search(eventIds)
 
     override fun insert(event: Event) = eventMapper.insert(event)
+
+    override fun update(event: Event) = eventMapper.update(event)
+
+    override fun updateBranding(event: Event) = eventMapper.updateBranding(event)
 }
