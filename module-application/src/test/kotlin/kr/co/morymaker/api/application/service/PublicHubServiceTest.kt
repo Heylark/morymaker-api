@@ -61,6 +61,7 @@ class PublicHubServiceTest {
         titleColor = null,
         bodyColor = null,
         kv = null,
+        defaultIdleMode = null,
         smsPolicy = null,
         createdAt = Instant.now(),
     )

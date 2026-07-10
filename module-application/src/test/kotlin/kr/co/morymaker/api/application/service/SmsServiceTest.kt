@@ -54,7 +54,7 @@ class SmsServiceTest {
         id = "ev1", name = "2026 신년 VIP 만찬", eventDate = Instant.parse("2026-01-10T01:00:00Z"),
         place = "그랜드볼룸", type = null, status = "준비", active = false,
         bgColor = null, pointColor = null, titleColor = null, bodyColor = null, kv = null,
-        smsPolicy = null, createdAt = Instant.now(),
+        defaultIdleMode = null, smsPolicy = null, createdAt = Instant.now(),
     )
 
     private fun sampleTemplate(body: String = "[\$참석자]님 안내드립니다. [\$QR링크]") = SmsTemplate(

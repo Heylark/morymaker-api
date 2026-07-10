@@ -12,6 +12,7 @@ import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequ
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.request.RequestPostProcessor
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
@@ -176,5 +177,131 @@ class EventControllerTest(
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data").isArray)
             .andExpect(jsonPath("$.data.length()").value(0))
+    }
+
+    // ── update(§2-4) ───────────────────────────────────────────────
+
+    @Test
+    fun `EVENT_ADMIN은 담당 행사의 일반 필드를 수정할 수 있다`() {
+        val id = createEventAsSystemAdmin("수정 대상 행사")
+
+        mockMvc.perform(
+            put("/api/events/$id")
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(id)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"name":"수정된 행사명","place":"새 장소","status":"운영중","active":true}"""),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.name").value("수정된 행사명"))
+            .andExpect(jsonPath("$.data.place").value("새 장소"))
+            .andExpect(jsonPath("$.data.status").value("운영중"))
+            .andExpect(jsonPath("$.data.active").value(true))
+    }
+
+    @Test
+    fun `PUT §2-4 요청에 bgColor를 포함해도 무시되고 저장된 브랜딩 컬러는 변하지 않는다(저장 게이트 회귀)`() {
+        val id = createEventAsSystemAdmin("게이트 회귀 대상")
+        // 최초 브랜딩 저장(§11-1) — 이후 §2-4가 이 값을 건드리지 않아야 한다.
+        mockMvc.perform(
+            put("/api/events/$id/branding")
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(id)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"bgColor":"#0c1322","pointColor":"#c9a24a","titleColor":"#ffffff","bodyColor":"#d9d9d9"}"""),
+        ).andExpect(status().isOk)
+
+        // §2-4 PUT에 bgColor를 얹어 보내도(EventUpdateRequest엔 필드 자체가 없어 역직렬화 시 무시) 컬러는 불변.
+        mockMvc.perform(
+            put("/api/events/$id")
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(id)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"name":"게이트 회귀 대상","status":"준비","active":false,"bgColor":"#ff0000"}"""),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.bgColor").value("#0c1322"))
+
+        mockMvc.perform(
+            get("/api/events/$id").with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(id))),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.bgColor").value("#0c1322"))
+            .andExpect(jsonPath("$.data.pointColor").value("#c9a24a"))
+    }
+
+    @Test
+    fun `name 없이 수정 요청하면 400 VALIDATION_FAILED를 반환한다`() {
+        val id = createEventAsSystemAdmin("검증 대상")
+
+        mockMvc.perform(
+            put("/api/events/$id")
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(id)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"status":"준비","active":false}"""),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+    }
+
+    @Test
+    fun `EVENT_ADMIN이 담당 아닌 행사를 수정하면 403 EVENT_FORBIDDEN을 받는다`() {
+        val id = createEventAsSystemAdmin("타 담당자 수정 대상")
+
+        mockMvc.perform(
+            put("/api/events/$id")
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf("다른-행사-id")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"name":"타 담당자 수정 대상","status":"준비","active":false}"""),
+        )
+            .andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.error.code").value("EVENT_FORBIDDEN"))
+    }
+
+    // ── updateBranding(§11-1, ADM-04 명시 저장 게이트) ───────────────
+
+    @Test
+    fun `EVENT_ADMIN은 브랜딩 컬러4종·kv·defaultIdleMode를 저장할 수 있다`() {
+        val id = createEventAsSystemAdmin("브랜딩 저장 대상")
+
+        mockMvc.perform(
+            put("/api/events/$id/branding")
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(id)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """{"bgColor":"#0c1322","pointColor":"#c9a24a","titleColor":"#ffffff",""" +
+                        """"bodyColor":"#d9d9d9","kv":"2026 NEW YEAR GALA","defaultIdleMode":"branded"}""",
+                ),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.bgColor").value("#0c1322"))
+            .andExpect(jsonPath("$.data.kv").value("2026 NEW YEAR GALA"))
+            .andExpect(jsonPath("$.data.defaultIdleMode").value("branded"))
+    }
+
+    @Test
+    fun `브랜딩 저장 요청에 컬러 형식이 RRGGBB가 아니면 400 VALIDATION_FAILED를 받는다`() {
+        val id = createEventAsSystemAdmin("컬러 검증 대상")
+
+        mockMvc.perform(
+            put("/api/events/$id/branding")
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(id)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"bgColor":"blue"}"""),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+    }
+
+    @Test
+    fun `브랜딩 저장 요청은 컬러 필드가 모두 null이어도 kv·defaultIdleMode만 저장할 수 있다`() {
+        val id = createEventAsSystemAdmin("kv만 수정 대상")
+
+        mockMvc.perform(
+            put("/api/events/$id/branding")
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(id)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"kv":"업데이트된 KV","defaultIdleMode":"fullbleed"}"""),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.kv").value("업데이트된 KV"))
+            .andExpect(jsonPath("$.data.defaultIdleMode").value("fullbleed"))
     }
 }

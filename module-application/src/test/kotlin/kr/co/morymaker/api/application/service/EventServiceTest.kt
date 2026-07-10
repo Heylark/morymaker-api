@@ -5,6 +5,8 @@ import io.mockk.mockk
 import io.mockk.verify
 import io.mockk.verifyOrder
 import kr.co.morymaker.api.application.port.`in`.CreateEventCommand
+import kr.co.morymaker.api.application.port.`in`.UpdateBrandingCommand
+import kr.co.morymaker.api.application.port.`in`.UpdateEventCommand
 import kr.co.morymaker.api.application.port.out.EventPort
 import kr.co.morymaker.api.application.security.EventAccessDeniedException
 import kr.co.morymaker.api.application.security.EventScopeGuard
@@ -14,6 +16,7 @@ import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -34,11 +37,12 @@ class EventServiceTest {
         type = null,
         status = "운영중",
         active = true,
-        bgColor = null,
-        pointColor = null,
-        titleColor = null,
-        bodyColor = null,
-        kv = null,
+        bgColor = "#0c1322",
+        pointColor = "#c9a24a",
+        titleColor = "#ffffff",
+        bodyColor = "#d9d9d9",
+        kv = "기존 KV",
+        defaultIdleMode = "branded",
         smsPolicy = null,
         createdAt = Instant.now(),
     )
@@ -118,9 +122,100 @@ class EventServiceTest {
         assertFalse(result.active)
         assertEquals(Event.DEFAULT_SMS_POLICY, result.smsPolicy)
         assertEquals("창립 30주년 기념식", result.name)
+        assertNull(result.defaultIdleMode)
         assertTrue(result.id.isNotBlank())
         assertEquals(result.id, inserted.captured.id)
         verify(exactly = 1) { eventPort.insert(any()) }
+    }
+
+    // ── updateEvent(§2-4) — 저장 게이트 회귀 검증 ─────────────────────
+
+    @Test
+    fun `updateEvent는 일반 필드만 병합해 update 포트로 위임하고 브랜딩 필드는 기존 값을 그대로 보존한다`() {
+        every { eventScopeGuard.assertAccess("ev1") } returns Unit
+        every { eventPort.fetch("ev1") } returns sampleEvent("ev1")
+        val updated = io.mockk.slot<Event>()
+        every { eventPort.update(capture(updated)) } returns Unit
+
+        val command = UpdateEventCommand(
+            name = "수정된 행사명",
+            eventDate = null,
+            place = "새 장소",
+            type = "연회식",
+            kv = "새 KV",
+            status = "운영중",
+            active = true,
+        )
+        val result = service.updateEvent("ev1", command)
+
+        assertEquals("수정된 행사명", result.name)
+        assertEquals("새 장소", result.place)
+        assertEquals("새 KV", result.kv)
+        // 브랜딩 필드는 §2-4 UpdateEventCommand에 필드 자체가 없어 기존 값이 그대로 유지된다(ADR-001 게이트).
+        assertEquals("#0c1322", result.bgColor)
+        assertEquals("#c9a24a", result.pointColor)
+        assertEquals("#ffffff", result.titleColor)
+        assertEquals("#d9d9d9", result.bodyColor)
+        assertEquals("branded", result.defaultIdleMode)
+        assertEquals("수정된 행사명", updated.captured.name)
+        verify(exactly = 1) { eventPort.update(any()) }
+        verify(exactly = 0) { eventPort.updateBranding(any()) }
+    }
+
+    @Test
+    fun `updateEvent는 존재하지 않는 행사면 NoSuchElementException을 던진다`() {
+        every { eventScopeGuard.assertAccess("ghost") } returns Unit
+        every { eventPort.fetch("ghost") } returns null
+
+        val command = UpdateEventCommand(
+            name = "무엇", eventDate = null, place = null, type = null,
+            kv = null, status = "준비", active = false,
+        )
+        assertFailsWith<NoSuchElementException> { service.updateEvent("ghost", command) }
+    }
+
+    // ── updateBranding(§11-1) — 명시 저장 게이트 검증 ──────────────────
+
+    @Test
+    fun `updateBranding은 컬러4종·kv·defaultIdleMode만 병합하고 일반 필드는 기존 값을 그대로 보존한다`() {
+        every { eventScopeGuard.assertAccess("ev1") } returns Unit
+        every { eventPort.fetch("ev1") } returns sampleEvent("ev1")
+        val updated = io.mockk.slot<Event>()
+        every { eventPort.updateBranding(capture(updated)) } returns Unit
+
+        val command = UpdateBrandingCommand(
+            bgColor = "#111111",
+            pointColor = "#222222",
+            titleColor = "#333333",
+            bodyColor = "#444444",
+            kv = "브랜딩 KV",
+            defaultIdleMode = "fullbleed",
+        )
+        val result = service.updateBranding("ev1", command)
+
+        assertEquals("#111111", result.bgColor)
+        assertEquals("#222222", result.pointColor)
+        assertEquals("#333333", result.titleColor)
+        assertEquals("#444444", result.bodyColor)
+        assertEquals("fullbleed", result.defaultIdleMode)
+        // 일반 필드는 UpdateBrandingCommand에 필드 자체가 없어 기존 값이 그대로 유지된다.
+        assertEquals("샘플 행사", result.name)
+        assertEquals("운영중", result.status)
+        assertEquals(updated.captured.bgColor, result.bgColor)
+        verify(exactly = 1) { eventPort.updateBranding(any()) }
+        verify(exactly = 0) { eventPort.update(any()) }
+    }
+
+    @Test
+    fun `updateBranding은 존재하지 않는 행사면 NoSuchElementException을 던진다`() {
+        every { eventScopeGuard.assertAccess("ghost") } returns Unit
+        every { eventPort.fetch("ghost") } returns null
+
+        val command = UpdateBrandingCommand(
+            bgColor = null, pointColor = null, titleColor = null, bodyColor = null,
+            kv = null, defaultIdleMode = null,
+        )
+        assertFailsWith<NoSuchElementException> { service.updateBranding("ghost", command) }
     }
 
     private fun slotCapture() = io.mockk.slot<Event>()
