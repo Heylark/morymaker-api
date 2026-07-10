@@ -304,4 +304,32 @@ class EventControllerTest(
             .andExpect(jsonPath("$.data.kv").value("업데이트된 KV"))
             .andExpect(jsonPath("$.data.defaultIdleMode").value("fullbleed"))
     }
+
+    @Test
+    fun `EVENT_ADMIN이 담당 아닌 행사의 브랜딩을 수정하면 403 EVENT_FORBIDDEN을 받는다(cross-tenant)`() {
+        val id = createEventAsSystemAdmin("브랜딩 타 담당자 대상")
+
+        mockMvc.perform(
+            put("/api/events/$id/branding")
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf("다른-행사-id")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"bgColor":"#ff0000"}"""),
+        )
+            .andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.error.code").value("EVENT_FORBIDDEN"))
+    }
+
+    @Test
+    fun `EVENT_STAFF는 브랜딩 저장 API에서 403 ROLE_FORBIDDEN을 받는다`() {
+        val id = createEventAsSystemAdmin("브랜딩 역할 검증 대상")
+
+        mockMvc.perform(
+            put("/api/events/$id/branding")
+                .with(authenticatedAs(roles = listOf("EVENT_STAFF"), eventIds = listOf(id)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"bgColor":"#ff0000"}"""),
+        )
+            .andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.error.code").value("ROLE_FORBIDDEN"))
+    }
 }

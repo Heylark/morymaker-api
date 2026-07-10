@@ -169,4 +169,27 @@ class IdleContentControllerTest(
             .andExpect(status().isForbidden)
             .andExpect(jsonPath("$.error.code").value("ROLE_FORBIDDEN"))
     }
+
+    @Test
+    fun `EVENT_ADMIN이 담당 아닌 행사의 콘텐츠를 수정하면 403 EVENT_FORBIDDEN을 받는다(cross-tenant PUT)`() {
+        val eid = createEvent()
+        val cid = createContent(eid)
+
+        mockMvc.perform(
+            put("/api/events/$eid/idle-contents/$cid")
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf("다른-행사-id")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"mode":"fullbleed","play":"침입 시도","sortOrder":9}"""),
+        )
+            .andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.error.code").value("EVENT_FORBIDDEN"))
+
+        // 거부된 수정 시도가 실제로 반영되지 않았는지 실 DB로 재확인(담당 행사 관점 재조회).
+        mockMvc.perform(
+            get("/api/events/$eid/idle-contents")
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data[0].play").value("8초 롤링"))
+    }
 }
