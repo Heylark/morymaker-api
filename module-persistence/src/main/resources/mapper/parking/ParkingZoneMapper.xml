@@ -59,6 +59,13 @@
           AND id = #{id}
     </select>
 
+    <select id="findById" resultMap="BaseResultMap">
+        SELECT
+            <include refid="columns"/>
+        FROM parking_zone
+        WHERE id = #{id}
+    </select>
+
     <insert id="insert" parameterType="kr.co.morymaker.api.domain.parking.ParkingZone">
         INSERT INTO parking_zone (
             id
