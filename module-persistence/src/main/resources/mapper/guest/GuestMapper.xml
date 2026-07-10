@@ -77,12 +77,24 @@
           AND g.id = #{gid}
     </select>
 
+    <!--
+        seat_label 실좌석 승격(§12-6, T-A07) — sg(그룹)는 라벨 소스로 유지, 신규 sa(좌석)는 ord만
+        결합한다. 조인 키에 sa.seat_group_id = g.seat_group_id를 포함해 sg와 sa가 같은 그룹일
+        때만 ord가 붙는다 — 라벨·번호 소스 불일치(예: H그룹 라벨 + G그룹 번호)를 원천 차단한다.
+        uq_seatassign_guest(guest_id) UNIQUE(V3)가 "그룹당 sa 매칭 ≤1"을 보장하므로 fan-out(명단
+        행 중복)이 없다.
+    -->
     <select id="selectDetailById" resultMap="DetailResultMap">
         SELECT
             <include refid="columns"/>
-            , sg.label AS seat_label
+            , CASE
+                WHEN sg.id IS NULL THEN NULL
+                WHEN sg.numbering = 1 AND sa.ord IS NOT NULL THEN CONCAT(sg.label, ' ', sa.ord, '번')
+                ELSE sg.label
+              END AS seat_label
         FROM guest g
         LEFT JOIN seat_group sg ON g.seat_group_id = sg.id AND sg.event_id = g.event_id
+        LEFT JOIN seat_assignment sa ON sa.guest_id = g.id AND sa.seat_group_id = g.seat_group_id AND sa.event_id = g.event_id
         WHERE g.event_id = #{eventId}
           AND g.id = #{gid}
     </select>
@@ -90,9 +102,14 @@
     <select id="selectDetailByToken" resultMap="DetailResultMap">
         SELECT
             <include refid="columns"/>
-            , sg.label AS seat_label
+            , CASE
+                WHEN sg.id IS NULL THEN NULL
+                WHEN sg.numbering = 1 AND sa.ord IS NOT NULL THEN CONCAT(sg.label, ' ', sa.ord, '번')
+                ELSE sg.label
+              END AS seat_label
         FROM guest g
         LEFT JOIN seat_group sg ON g.seat_group_id = sg.id AND sg.event_id = g.event_id
+        LEFT JOIN seat_assignment sa ON sa.guest_id = g.id AND sa.seat_group_id = g.seat_group_id AND sa.event_id = g.event_id
         WHERE g.event_id = #{eventId}
           AND g.token = #{token}
     </select>
@@ -101,14 +118,19 @@
         공개(비로그인) 경로 전용 — event_id 조건 없이 token 단독으로 조회한다. token은
         uk_guest_token UNIQUE라 전역에서 최대 1건만 매칭되며, 이 쿼리 자체가 이미 인가(공개
         경로는 행사 스코프 가드를 호출하지 않고 token capability 유효성 검증으로 대체한다)의
-        실행 지점이다.
+        실행 지점이다. sa 조인의 sa.event_id = g.event_id가 event_id 조건 부재를 스코프한다.
     -->
     <select id="selectDetailByGlobalToken" resultMap="DetailResultMap">
         SELECT
             <include refid="columns"/>
-            , sg.label AS seat_label
+            , CASE
+                WHEN sg.id IS NULL THEN NULL
+                WHEN sg.numbering = 1 AND sa.ord IS NOT NULL THEN CONCAT(sg.label, ' ', sa.ord, '번')
+                ELSE sg.label
+              END AS seat_label
         FROM guest g
         LEFT JOIN seat_group sg ON g.seat_group_id = sg.id AND sg.event_id = g.event_id
+        LEFT JOIN seat_assignment sa ON sa.guest_id = g.id AND sa.seat_group_id = g.seat_group_id AND sa.event_id = g.event_id
         WHERE g.token = #{token}
     </select>
 
@@ -120,9 +142,14 @@
     <select id="search" resultMap="DetailResultMap">
         SELECT
             <include refid="columns"/>
-            , sg.label AS seat_label
+            , CASE
+                WHEN sg.id IS NULL THEN NULL
+                WHEN sg.numbering = 1 AND sa.ord IS NOT NULL THEN CONCAT(sg.label, ' ', sa.ord, '번')
+                ELSE sg.label
+              END AS seat_label
         FROM guest g
         LEFT JOIN seat_group sg ON g.seat_group_id = sg.id AND sg.event_id = g.event_id
+        LEFT JOIN seat_assignment sa ON sa.guest_id = g.id AND sa.seat_group_id = g.seat_group_id AND sa.event_id = g.event_id
         WHERE g.event_id = #{eventId}
         <if test="!query.includeCancelled">
             AND g.status != '취소'
@@ -251,6 +278,29 @@
            SET plate = #{plate}
          WHERE id = #{gid}
            AND (plate IS NULL OR plate = '')
+    </update>
+
+    <!-- ➕ §12 신규 — seat→guest 매핑(M1 payload 검증·M3 동기화). 기존 쿼리·resultMap은 미접촉(additive만). -->
+
+    <!-- event 소속 guestId만 필터링(§12-5 M1 payload 검증) — 존재하는 id만 되돌려준다. -->
+    <select id="selectExistingIds" resultType="string">
+        SELECT id
+        FROM guest
+        WHERE event_id = #{eventId}
+          AND id IN
+        <foreach collection="guestIds" item="gid" open="(" separator="," close=")">
+            #{gid}
+        </foreach>
+    </select>
+
+    <!-- guest.seat_group_id 일괄 갱신(§12-5 M3 동기화) — seatGroupId가 null이면 배정 해제. -->
+    <update id="updateSeatGroupId">
+        UPDATE guest
+           SET seat_group_id = #{seatGroupId}
+         WHERE id IN
+        <foreach collection="guestIds" item="gid" open="(" separator="," close=")">
+            #{gid}
+        </foreach>
     </update>
 
 </mapper>
