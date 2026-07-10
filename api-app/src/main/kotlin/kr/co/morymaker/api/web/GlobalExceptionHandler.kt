@@ -3,6 +3,7 @@ package kr.co.morymaker.api.web
 import com.fasterxml.jackson.databind.exc.MismatchedInputException
 import jakarta.validation.ConstraintViolationException
 import kr.co.morymaker.api.application.parking.SlotOccupiedException
+import kr.co.morymaker.api.application.seat.SeatConflictException
 import kr.co.morymaker.api.application.security.EventAccessDeniedException
 import kr.co.morymaker.api.application.service.EventNotOpenException
 import kr.co.morymaker.api.application.service.SmsSendBlockedException
@@ -88,6 +89,13 @@ class GlobalExceptionHandler {
     fun handleSlotOccupied(e: SlotOccupiedException): ResponseEntity<ErrorBody> =
         ResponseEntity.status(HttpStatus.CONFLICT)
             .body(ErrorBody(ErrorDetail("SLOT_OCCUPIED", e.message ?: "이미 사용 중인 자리입니다")))
+
+    // 좌석 배정 충돌(§12-5, SEAT-CONCURRENCY-GUARD) — cross-group 중복배정 사전검사 또는
+    // guest_id UNIQUE 경쟁 후착·DELETE 갭 경합이 서비스에서 이 도메인 예외로 번역되어 올라온다.
+    @ExceptionHandler(SeatConflictException::class)
+    fun handleSeatConflict(e: SeatConflictException): ResponseEntity<ErrorBody> =
+        ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(ErrorBody(ErrorDetail("SEAT_CONFLICT", e.message ?: "좌석 배정이 충돌했습니다")))
 
     // 현장등록 status 게이트 — 종료된 행사만 이 예외 대상이다(준비·운영중은 정상 진행).
     @ExceptionHandler(EventNotOpenException::class)
