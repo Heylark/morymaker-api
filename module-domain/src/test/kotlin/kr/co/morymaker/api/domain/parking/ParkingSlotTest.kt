@@ -66,4 +66,20 @@ class ParkingSlotTest {
     fun `slotCode는 slot_no가 99를 넘으면 3자리로 자연 확장된다`() {
         assertEquals("z1-100", ParkingSlot.slotCode("z1", 100))
     }
+
+    @Test
+    fun `parse는 slotCode를 zoneId와 자리번호로 역파싱한다(zoneId 자체의 하이픈 포함 UUID 대응)`() {
+        assertEquals(SlotCodeRef("z1", 8), ParkingSlot.parse("z1-08"))
+        assertEquals(
+            SlotCodeRef("550e8400-e29b-41d4-a716-446655440000", 3),
+            ParkingSlot.parse("550e8400-e29b-41d4-a716-446655440000-03"),
+        )
+    }
+
+    @Test
+    fun `parse는 하이픈이 없거나 zoneId가 비었거나 자리번호가 비수치면 null을 반환한다`() {
+        assertEquals(null, ParkingSlot.parse("nohyphencode"))
+        assertEquals(null, ParkingSlot.parse("-08"))
+        assertEquals(null, ParkingSlot.parse("z1-abc"))
+    }
 }
