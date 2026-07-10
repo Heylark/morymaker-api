@@ -11,6 +11,7 @@ import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.request.RequestPostProcessor
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
@@ -180,5 +181,42 @@ class CheckinControllerTest(
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.status").value("대기"))
+    }
+
+    // ── seatLabel 실좌석 승격(§12-6) 회귀 — numbering ON + 배정 ────────
+
+    @Test
+    fun `numbering ON 그룹에 배정된 참석자는 체크인 응답 guest에 A열 12번 형식 seatLabel이 채워진다`() {
+        val eid = createEvent()
+        val (gid, token) = registerGuest(eid, "박동현")
+        val groupResponse = mockMvc.perform(
+            post("/api/events/$eid/seat-groups")
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"label":"A열","numbering":true}"""),
+        ).andExpect(status().isCreated).andReturn().response.contentAsString
+        val groupNo = objectMapper.readTree(groupResponse).get("data").get("groupNo").asInt()
+        // numbering ON 그룹의 §12-5 PUT은 그룹 전체 슬롯 세트를 원자 교체한다 — ord는 1..N 연속·
+        // 유일해야 하므로 목표 ord(3번)까지의 빈좌석(1·2번)도 함께 제출해야 한다(단일 entry로
+        // ord=12만 보내면 "1..N 연속" 검증에 걸려 400 VALIDATION_FAILED).
+        mockMvc.perform(
+            put("/api/events/$eid/seat-assignments")
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """{"groupNo":$groupNo,"assignments":[
+                        {"ord":1,"guestId":null},{"ord":2,"guestId":null},{"ord":3,"guestId":"$gid"}
+                    ]}""",
+                ),
+        ).andExpect(status().isOk)
+
+        mockMvc.perform(
+            post("/api/events/$eid/checkin")
+                .with(authenticatedAs(roles = listOf("EVENT_STAFF"), eventIds = listOf(eid)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"token":"$token"}"""),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.guest.seatLabel").value("A열 3번"))
     }
 }

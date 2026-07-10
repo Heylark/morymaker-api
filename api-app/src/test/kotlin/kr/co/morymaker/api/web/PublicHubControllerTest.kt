@@ -12,6 +12,7 @@ import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequ
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.request.RequestPostProcessor
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
@@ -163,5 +164,36 @@ class PublicHubControllerTest(
         )
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+    }
+
+    // ── seatLabel 실좌석 승격(§12-6) 회귀 — numbering ON + 배정 ────────
+
+    @Test
+    fun `numbering ON 그룹에 배정된 참석자는 개인 허브 응답 guest에 라벨과 번호가 병기된다`() {
+        val eid = createEvent()
+        val (gid, token) = registerGuest(eid, "이도현")
+        val groupResponse = mockMvc.perform(
+            post("/api/events/$eid/seat-groups")
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"label":"B열","numbering":true}"""),
+        ).andExpect(status().isCreated).andReturn().response.contentAsString
+        val groupNo = objectMapper.readTree(groupResponse).get("data").get("groupNo").asInt()
+        // numbering ON 그룹의 §12-5 PUT은 그룹 전체 슬롯 세트를 원자 교체한다 — ord는 1..N 연속·
+        // 유일해야 하므로 목표 ord(3번)까지의 빈좌석(1·2번)도 함께 제출해야 한다.
+        mockMvc.perform(
+            put("/api/events/$eid/seat-assignments")
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """{"groupNo":$groupNo,"assignments":[
+                        {"ord":1,"guestId":null},{"ord":2,"guestId":null},{"ord":3,"guestId":"$gid"}
+                    ]}""",
+                ),
+        ).andExpect(status().isOk)
+
+        mockMvc.perform(get("/api/public/u/$token"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.guest.seatLabel").value("B열 3번"))
     }
 }

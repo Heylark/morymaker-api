@@ -255,4 +255,52 @@ class GuestControllerTest(
         )
             .andExpect(jsonPath("$.meta.searchState").value("NONE"))
     }
+
+    // ── seatLabel 실좌석 승격(§12-6) 회귀 — numbering ON + 배정 ────────
+
+    @Test
+    fun `numbering ON 그룹에서 좌석 배정된 참석자는 명단 조회에서 seatLabel이 라벨과 번호로 병기된다`() {
+        val eid = createEvent()
+        val gid = registerGuest(eid, "김아름")
+        val groupResponse = mockMvc.perform(
+            post("/api/events/$eid/seat-groups")
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"label":"A열","numbering":true}"""),
+        ).andExpect(status().isCreated).andReturn().response.contentAsString
+        val groupNo = objectMapper.readTree(groupResponse).get("data").get("groupNo").asInt()
+
+        // numbering ON 그룹의 §12-5 PUT은 그룹 전체 슬롯 세트를 원자 교체한다 — ord는 1..N 연속·
+        // 유일해야 하므로 목표 ord(3번)까지의 빈좌석(1·2번)도 함께 제출해야 한다.
+        mockMvc.perform(
+            put("/api/events/$eid/seat-assignments")
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """{"groupNo":$groupNo,"assignments":[
+                        {"ord":1,"guestId":null},{"ord":2,"guestId":null},{"ord":3,"guestId":"$gid"}
+                    ]}""",
+                ),
+        ).andExpect(status().isOk)
+
+        mockMvc.perform(
+            get("/api/events/$eid/guests?q=김아름")
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data[0].seatLabel").value("A열 3번"))
+    }
+
+    @Test
+    fun `좌석 그룹이 전혀 없는 참석자는 seatLabel이 null이다`() {
+        val eid = createEvent()
+        registerGuest(eid, "미배정참석자")
+
+        mockMvc.perform(
+            get("/api/events/$eid/guests?q=미배정참석자")
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data[0].seatLabel").doesNotExist())
+    }
 }
