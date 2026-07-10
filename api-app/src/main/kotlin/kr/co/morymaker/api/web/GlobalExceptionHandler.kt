@@ -5,6 +5,7 @@ import jakarta.validation.ConstraintViolationException
 import kr.co.morymaker.api.application.parking.SlotOccupiedException
 import kr.co.morymaker.api.application.security.EventAccessDeniedException
 import kr.co.morymaker.api.application.service.EventNotOpenException
+import kr.co.morymaker.api.application.service.SmsSendBlockedException
 import kr.co.morymaker.api.dto.ErrorBody
 import kr.co.morymaker.api.dto.ErrorDetail
 import org.slf4j.LoggerFactory
@@ -93,6 +94,12 @@ class GlobalExceptionHandler {
     fun handleEventNotOpen(e: EventNotOpenException): ResponseEntity<ErrorBody> =
         ResponseEntity.status(HttpStatus.CONFLICT)
             .body(ErrorBody(ErrorDetail("EVENT_CLOSED", e.message ?: "종료된 행사입니다")))
+
+    // 문자 발송 게이트 재검증 실패(§7-4) — canSend=false(누락자 존재)인데 발송을 시도한 경우.
+    @ExceptionHandler(SmsSendBlockedException::class)
+    fun handleSmsSendBlocked(e: SmsSendBlockedException): ResponseEntity<ErrorBody> =
+        ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(ErrorBody(ErrorDetail("SMS_SEND_BLOCKED", e.message ?: "발송할 수 없는 참석자가 있습니다")))
 
     // 현장등록 공개 POST rate limit 초과 — PublicRateLimitInterceptor가 던진다.
     @ExceptionHandler(RateLimitExceededException::class)

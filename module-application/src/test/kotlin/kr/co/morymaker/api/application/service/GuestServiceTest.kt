@@ -11,6 +11,7 @@ import kr.co.morymaker.api.application.port.`in`.RegisterGuestCommand
 import kr.co.morymaker.api.application.port.`in`.UpdateGuestCommand
 import kr.co.morymaker.api.application.port.out.GuestListItem
 import kr.co.morymaker.api.application.port.out.GuestPort
+import kr.co.morymaker.api.application.port.out.SmsLogPort
 import kr.co.morymaker.api.application.security.EventScopeGuard
 import kr.co.morymaker.api.domain.guest.Guest
 import org.junit.jupiter.api.Test
@@ -32,7 +33,8 @@ class GuestServiceTest {
     private val guestPort = mockk<GuestPort>()
     private val eventScopeGuard = mockk<EventScopeGuard>()
     private val guestWriteSupport = mockk<GuestWriteSupport>()
-    private val service = GuestService(guestPort, eventScopeGuard, guestWriteSupport)
+    private val smsLogPort = mockk<SmsLogPort>()
+    private val service = GuestService(guestPort, eventScopeGuard, guestWriteSupport, smsLogPort)
 
     private fun sampleGuest(
         id: String = "g1",
@@ -144,17 +146,34 @@ class GuestServiceTest {
     // ── cancelGuest ────────────────────────────────────────────────
 
     @Test
-    fun `cancelGuest는 상태를 취소로 전환한다`() {
+    fun `cancelGuest는 상태를 취소로 전환하고 deleteSmsLog=true면 발송 이력도 함께 삭제한다`() {
+        every { eventScopeGuard.assertAccess("ev1") } returns Unit
+        val existing = sampleGuest(id = "g1", status = Guest.STATUS_WAITING)
+        every { guestPort.fetchById("ev1", "g1") } returns existing
+        val updated = slot<Guest>()
+        every { guestPort.update(capture(updated)) } returns Unit
+        every { smsLogPort.deleteByGuest("ev1", "g1") } returns Unit
+
+        val result = service.cancelGuest("ev1", "g1", deleteSmsLog = true)
+
+        assertEquals(Guest.STATUS_CANCELLED, result.status)
+        assertEquals(Guest.STATUS_CANCELLED, updated.captured.status)
+        verify(exactly = 1) { smsLogPort.deleteByGuest("ev1", "g1") }
+    }
+
+    @Test
+    fun `cancelGuest는 deleteSmsLog=false면 발송 이력을 건드리지 않는다(byte-identical 경로)`() {
         every { eventScopeGuard.assertAccess("ev1") } returns Unit
         val existing = sampleGuest(id = "g1", status = Guest.STATUS_WAITING)
         every { guestPort.fetchById("ev1", "g1") } returns existing
         val updated = slot<Guest>()
         every { guestPort.update(capture(updated)) } returns Unit
 
-        val result = service.cancelGuest("ev1", "g1", deleteSmsLog = true)
+        val result = service.cancelGuest("ev1", "g1", deleteSmsLog = false)
 
         assertEquals(Guest.STATUS_CANCELLED, result.status)
         assertEquals(Guest.STATUS_CANCELLED, updated.captured.status)
+        verify(exactly = 0) { smsLogPort.deleteByGuest(any(), any()) }
     }
 
     // ── listGuests / searchState ──────────────────────────────────
