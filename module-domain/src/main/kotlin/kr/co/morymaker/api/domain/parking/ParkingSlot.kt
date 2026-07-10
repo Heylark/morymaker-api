@@ -42,4 +42,17 @@ object ParkingSlot {
      * slotSig·parking_slot_title.slot_no·QR 파일명과 항상 동일 번호를 가리킨다 — 예 "z1-08".
      */
     fun slotCode(zoneId: String, slotNo: Int): String = "$zoneId-${"%02d".format(slotNo)}"
+
+    /**
+     * [slotCode]의 역함수(공개 자리 QR 경로 전용) — zoneId 자체가 UUID(하이픈 포함)라 마지막
+     * `-` 기준으로 나눈다(첫 `-` 기준이면 zoneId가 잘린다). 실패(하이픈 없음·zoneId 빈값·
+     * 자리번호 비수치) → null(호출자가 404로 매핑, enumeration-safe).
+     */
+    fun parse(slotCode: String): SlotCodeRef? {
+        val idx = slotCode.lastIndexOf('-')
+        if (idx <= 0) return null
+        val zoneId = slotCode.substring(0, idx)
+        val slotNo = slotCode.substring(idx + 1).toIntOrNull() ?: return null
+        return SlotCodeRef(zoneId, slotNo)
+    }
 }

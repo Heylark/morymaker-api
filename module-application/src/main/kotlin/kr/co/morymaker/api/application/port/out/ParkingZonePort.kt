@@ -16,6 +16,14 @@ interface ParkingZonePort {
     /** 소유 검증 겸 단건 조회(§6-3 zone 소속 확인). 없으면 null. */
     fun fetchById(eventId: String, id: String): ParkingZone?
 
+    /**
+     * zoneId 단독 lock-free 조회(공개 자리 QR 경로 전용, §10-3) — eventId 소유 검증 없이 PK만
+     * 으로 조회한다. 공개 경로는 slotCode(zoneId만 포함, eventId 미포함)만으로 구획을 찾아
+     * eventId를 이 조회 결과에서 역으로 파생해야 한다(잠금 없는 단순 조회, 동시성 영향 없음).
+     * 없으면 null.
+     */
+    fun findById(zoneId: String): ParkingZone?
+
     fun insert(zone: ParkingZone)
 
     fun update(zone: ParkingZone)

@@ -25,6 +25,8 @@ internal class ParkingZonePersistenceAdapter(
 
     override fun fetchById(eventId: String, id: String): ParkingZone? = zoneMapper.fetchById(eventId, id)
 
+    override fun findById(zoneId: String): ParkingZone? = zoneMapper.findById(zoneId)
+
     override fun insert(zone: ParkingZone) = zoneMapper.insert(zone)
 
     override fun update(zone: ParkingZone) = zoneMapper.update(zone)

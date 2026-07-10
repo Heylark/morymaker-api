@@ -21,6 +21,9 @@ interface ParkingZoneMapper {
     /** 소유 검증 겸 단건 조회(§6-3). 없으면 null. */
     fun fetchById(@Param("eventId") eventId: String, @Param("id") id: String): ParkingZone?
 
+    /** zoneId 단독 조회(공개 자리 QR 경로 전용, §10-3). 잠금 없음. 없으면 null. */
+    fun findById(@Param("id") id: String): ParkingZone?
+
     fun insert(zone: ParkingZone)
 
     fun update(zone: ParkingZone)
