@@ -182,7 +182,7 @@ class ParkingZoneControllerTest(
             .andExpect(jsonPath("$.error.code").value("ROLE_FORBIDDEN"))
     }
 
-    // ── slots(§6-4b, scanUrl) ────────────────────────────────────────
+    // ── slots(scanUrl 노출) ────────────────────────────────────────────
 
     @Test
     fun `slots는 scanUrl을 포함한 자리 목록을 반환한다`() {

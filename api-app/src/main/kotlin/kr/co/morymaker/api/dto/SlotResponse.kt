@@ -2,7 +2,7 @@ package kr.co.morymaker.api.dto
 
 import kr.co.morymaker.api.application.port.`in`.SlotView
 
-/** 자리 QR 응답 DTO(§6-4b 신설) — scanUrl은 qrZip과 동일 조립식을 공유(SSOT). web ADM-07 QrPreview 소비 계약. */
+/** 자리 QR 응답 DTO — scanUrl은 qrZip이 인코딩하는 QR payload와 동일 조립식을 공유한다(단일 진실 소스). 관리자 콘솔의 QR 미리보기 화면이 이 값을 그대로 인코딩해 렌더링한다. */
 data class SlotResponse(
     val slotNo: Int,
     val slotCode: String,

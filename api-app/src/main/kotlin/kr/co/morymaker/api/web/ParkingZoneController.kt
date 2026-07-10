@@ -83,7 +83,7 @@ class ParkingZoneController(
         return ApiResponse(zoneUseCase.updateZone(eid, zid, command).toResponse())
     }
 
-    /** 자리 목록(§6-4b 신설) — scanUrl 포함 JSON. web ADM-07 QrPreview가 이 값을 그대로 인코딩한다. */
+    /** 자리 목록 — scanUrl 포함 JSON. 관리자 콘솔의 QR 미리보기 화면이 이 값을 그대로 인코딩해 렌더링한다. */
     @GetMapping("/{zid}/slots")
     @PreAuthorize(MoryRoles.HAS_ADMIN_CONSOLE)
     fun slots(@PathVariable eid: String, @PathVariable zid: String): ApiResponse<List<SlotResponse>> =
