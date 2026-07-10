@@ -182,6 +182,84 @@ class ParkingZoneControllerTest(
             .andExpect(jsonPath("$.error.code").value("ROLE_FORBIDDEN"))
     }
 
+    // ── slots(§6-4b, scanUrl) ────────────────────────────────────────
+
+    @Test
+    fun `slots는 scanUrl을 포함한 자리 목록을 반환한다`() {
+        val eid = createEvent()
+        val zid = createZone(eid, part1 = "지하 2층", part2 = "A구역", startNo = 1, slotCount = 3)
+
+        mockMvc.perform(
+            get("/api/events/$eid/parking-zones/$zid/slots")
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.length()").value(3))
+            .andExpect(jsonPath("$.data[0].slotNo").value(1))
+            .andExpect(jsonPath("$.data[0].slotCode").value("$zid-01"))
+            .andExpect(jsonPath("$.data[0].slotFullName").value("지하 2층 A구역 1"))
+            .andExpect(jsonPath("$.data[0].scanUrl").value("https://park.morymaker.co.kr/p/$zid-01"))
+    }
+
+    @Test
+    fun `slots의 scanUrl과 qr-zip이 인코딩한 QR payload는 동일 조립식(SSOT)을 공유한다`() {
+        val eid = createEvent()
+        val zid = createZone(eid, part1 = "지하 2층", part2 = "A구역", startNo = 1, slotCount = 3)
+
+        val slotsResponse = mockMvc.perform(
+            get("/api/events/$eid/parking-zones/$zid/slots")
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
+        )
+            .andExpect(status().isOk)
+            .andReturn().response.getContentAsString(StandardCharsets.UTF_8)
+        val scanUrl = objectMapper.readTree(slotsResponse).get("data").get(0).get("scanUrl").asText()
+
+        val zipResult = mockMvc.perform(
+            get("/api/events/$eid/parking-zones/$zid/qr-zip")
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
+        )
+            .andExpect(status().isOk)
+            .andReturn()
+
+        val entries = mutableMapOf<String, ByteArray>()
+        ZipInputStream(ByteArrayInputStream(zipResult.response.contentAsByteArray)).use { zis ->
+            var entry = zis.nextEntry
+            while (entry != null) {
+                entries[entry.name] = zis.readBytes()
+                entry = zis.nextEntry
+            }
+        }
+        val decoded = decodeQr(entries["지하 2층 A구역 1.png"]!!)
+
+        assertEquals(scanUrl, decoded)
+    }
+
+    @Test
+    fun `EVENT_ADMIN이 담당 아닌 행사의 자리 목록을 조회하면 403 EVENT_FORBIDDEN을 받는다`() {
+        val eid = createEvent()
+        val zid = createZone(eid)
+
+        mockMvc.perform(
+            get("/api/events/$eid/parking-zones/$zid/slots")
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf("다른-행사-id"))),
+        )
+            .andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.error.code").value("EVENT_FORBIDDEN"))
+    }
+
+    @Test
+    fun `EVENT_STAFF는 자리 목록 API에서 403 ROLE_FORBIDDEN을 받는다`() {
+        val eid = createEvent()
+        val zid = createZone(eid)
+
+        mockMvc.perform(
+            get("/api/events/$eid/parking-zones/$zid/slots")
+                .with(authenticatedAs(roles = listOf("EVENT_STAFF"), eventIds = listOf(eid))),
+        )
+            .andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.error.code").value("ROLE_FORBIDDEN"))
+    }
+
     // ── qr-zip(§6-4a, P4) ──────────────────────────────────────────────
 
     @Test

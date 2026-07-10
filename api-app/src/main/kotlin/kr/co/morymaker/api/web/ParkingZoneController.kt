@@ -6,6 +6,7 @@ import kr.co.morymaker.api.application.port.`in`.ZoneCreateCommand
 import kr.co.morymaker.api.application.port.`in`.ZoneUpdateCommand
 import kr.co.morymaker.api.domain.security.MoryRoles
 import kr.co.morymaker.api.dto.ApiResponse
+import kr.co.morymaker.api.dto.SlotResponse
 import kr.co.morymaker.api.dto.ZoneCreateRequest
 import kr.co.morymaker.api.dto.ZoneResponse
 import kr.co.morymaker.api.dto.ZoneUpdateRequest
@@ -82,13 +83,19 @@ class ParkingZoneController(
         return ApiResponse(zoneUseCase.updateZone(eid, zid, command).toResponse())
     }
 
+    /** 자리 목록(§6-4b 신설) — scanUrl 포함 JSON. web ADM-07 QrPreview가 이 값을 그대로 인코딩한다. */
+    @GetMapping("/{zid}/slots")
+    @PreAuthorize(MoryRoles.HAS_ADMIN_CONSOLE)
+    fun slots(@PathVariable eid: String, @PathVariable zid: String): ApiResponse<List<SlotResponse>> =
+        ApiResponse(zoneUseCase.getSlotsForQr(eid, zid).slots.map { it.toResponse(qrBaseUrl) })
+
     /** 자리별 QR PNG 일괄 ZIP 다운로드(§6-4a). QR payload는 자리 중립 URL(3-6, 재인쇄 불요). */
     @GetMapping("/{zid}/qr-zip")
     @PreAuthorize(MoryRoles.HAS_ADMIN_CONSOLE)
     fun qrZip(@PathVariable eid: String, @PathVariable zid: String): ResponseEntity<ByteArray> {
         val bundle = zoneUseCase.getSlotsForQr(eid, zid)
         val entries = bundle.slots.map { slot ->
-            "${slot.slotFullName}.png" to QrCodeGenerator.encode("$qrBaseUrl/p/${slot.slotCode}")
+            "${slot.slotFullName}.png" to QrCodeGenerator.encode(slot.toResponse(qrBaseUrl).scanUrl)
         }
         val zipBytes = ZipBuilder.zip(entries)
         // 한글 파일명(RFC 5987) — URLEncoder는 공백을 '+'로 인코딩하므로 '%20'으로 치환한다.
