@@ -90,7 +90,7 @@ class GlobalExceptionHandler {
         ResponseEntity.status(HttpStatus.CONFLICT)
             .body(ErrorBody(ErrorDetail("SLOT_OCCUPIED", e.message ?: "이미 사용 중인 자리입니다")))
 
-    // 좌석 배정 충돌(§12-5, SEAT-CONCURRENCY-GUARD) — cross-group 중복배정 사전검사 또는
+    // 좌석 배정 충돌(§12-5) — cross-group 중복배정 사전검사 또는
     // guest_id UNIQUE 경쟁 후착·DELETE 갭 경합이 서비스에서 이 도메인 예외로 번역되어 올라온다.
     @ExceptionHandler(SeatConflictException::class)
     fun handleSeatConflict(e: SeatConflictException): ResponseEntity<ErrorBody> =

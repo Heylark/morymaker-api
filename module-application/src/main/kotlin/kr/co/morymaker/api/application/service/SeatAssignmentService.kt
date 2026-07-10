@@ -54,8 +54,10 @@ internal class SeatAssignmentService(
         val nonNullGuestIds = command.assignments.mapNotNull { it.guestId }
         require(nonNullGuestIds.size == nonNullGuestIds.toSet().size) { "같은 참석자를 중복 배정할 수 없습니다" }
 
-        // payload 검증(M1) — numbering ON은 ord가 1..N 연속·유일해야 한다(소수·문자·범위밖은
-        // DTO 타입 자체가 Int라 원천 거부, 여기서는 연속성·중복만 확인). OFF는 서버가 무시하고
+        // payload 검증(M1) — numbering ON은 ord가 1..N 연속·유일해야 한다. 문자·객체 ord는 DTO
+        // 타입이 Int라 역직렬화에서 거부되지만, 소수(예: 12.7)는 Jackson 기본 설정이 정수로 절삭해
+        // 받아들인다(스펙 "소수 거부"와의 갭 — tech-debt 등록). 절삭값이 1..N을 벗어나면 아래 검증이
+        // 거부하고, 벗어나지 않으면 유효 정수로 저장돼 데이터 무결성은 유지된다. OFF는 서버가 무시하고
         // ORD_UNNUMBERED로 강제하므로 payload ord 검증이 불필요하다.
         if (group.numbering) {
             val ords = command.assignments.map { it.ord }

@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
 /**
- * [SeatGroupUseCase] 구현체 — 그룹 CRUD(§12-1~3)와 numbering 토글 재해석(M4, `NUMBERING-TOGGLE-ORD`)을
+ * [SeatGroupUseCase] 구현체 — 그룹 CRUD(§12-1~3)와 numbering 토글 재해석(M4)을
  * 담당한다.
  *
  * 헥사고날 레이어: application(service). `internal`: api-app은 [SeatGroupUseCase] 인터페이스만
