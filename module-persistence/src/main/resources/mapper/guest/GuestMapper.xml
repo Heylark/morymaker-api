@@ -272,6 +272,36 @@
            AND status = '대기'
     </update>
 
+    <!--
+        조건부 체크인 전이(guestId 대상) — 대기·방문 어느 쪽에서 와도 참석으로 전이하되, 이미
+        참석 상태면 WHERE에서 걸러져 영향 0행(가드). affected rows를 서비스가 직접 읽어 "이 호출이
+        전이를 확정했는지"를 판정한다.
+
+        ⚠️ 호출 순서 계약 — 같은 트랜잭션에서 이 행을 먼저 SELECT한 뒤 호출하면 안 된다. MariaDB
+        InnoDB 스냅샷 격리(REPEATABLE READ)에서 먼저 읽어 스냅샷을 확정한 뒤 다른 트랜잭션이 그
+        사이 커밋 변경하면, 이어지는 UPDATE가 semi-consistent 재평가 없이 ER_CHECKREAD(1020)로
+        즉시 실패한다(SELECT FOR UPDATE의 갭락 데드락과 별개의 함정 — 실 DB 동시성 검증에서
+        재현). CheckinSupport는 이 UPDATE를 먼저 blind로 시도한 뒤에만 결과 조회를 한다.
+    -->
+    <update id="markAttendedIfNotAttended">
+        UPDATE guest
+           SET status = '참석'
+             , visit_at = #{visitAt}
+         WHERE id = #{gid}
+           AND event_id = #{eventId}
+           AND status != '참석'
+    </update>
+
+    <!-- 조건부 체크인 전이(token 대상) — markAttendedIfNotAttended와 동일 가드·동일 호출 순서 계약. -->
+    <update id="markAttendedIfNotAttendedByToken">
+        UPDATE guest
+           SET status = '참석'
+             , visit_at = #{visitAt}
+         WHERE token = #{token}
+           AND event_id = #{eventId}
+           AND status != '참석'
+    </update>
+
     <!-- plate 백필 — 기존 값이 비어 있을 때만 갱신(가드). -->
     <update id="backfillPlateIfEmpty">
         UPDATE guest
