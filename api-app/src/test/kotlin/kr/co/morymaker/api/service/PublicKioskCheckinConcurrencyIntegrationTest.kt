@@ -23,7 +23,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * 공개 kiosk 체크인([PublicKioskUseCase.checkin]) 동시성 실 DB 통합 테스트(REQ-0019, D-F) —
+ * 공개 kiosk 체크인([PublicKioskUseCase.checkin]) 동시성 실 DB 통합 테스트 —
  * 무인 kiosk 더블탭이 조건부 UPDATE(`markAttendedIfNotAttended`)로 정확히 1건만 CHECKED_IN으로
  * 수렴하는지 검증한다([PublicParkingConcurrencyIntegrationTest]와 동일 컨벤션·불변식 스타일).
  *

@@ -61,7 +61,7 @@ class PublicRateLimitInterceptorTest {
         assertTrue(target.preHandle(postRequest("5.5.5.5"), MockHttpServletResponse(), Any()))
     }
 
-    // ── kiosk GET 검사 대상 확장(D-B, REQ-0019) ─────────────────────────
+    // ── kiosk GET 검사 대상 확장 ──────────────────────────────────────
 
     @Test
     fun `kiosk 이름검색 GET 요청은 한도 이내면 통과한다`() {

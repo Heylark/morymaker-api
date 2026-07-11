@@ -21,16 +21,16 @@ import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
 /**
- * kiosk 공개 조회 API(REQ-0019, KIO-02·04·05) 통합 테스트 — 비로그인 접근·최소필드 구조적
- * 미노출(D-A)·eid capability 게이트(D-I)·체크인 멱등성(D-F)을 실 MariaDB로 검증한다.
+ * kiosk 공개 조회 API(KIO-02·04·05) 통합 테스트 — 비로그인 접근·최소필드 구조적 미노출·
+ * eid capability 게이트·체크인 멱등성을 실 MariaDB로 검증한다.
  *
  * `LookupControllerTest`·`PublicSecurityAdversarialTest`와 동일 컨벤션 — 좌석·주차 기록은
  * 전용 등록 API가 없어 `JdbcTemplate` 직접 삽입, `@Transactional`이 종료 시 자동 롤백한다.
  *
  * `@TestPropertySource`로 rate limit 임계를 크게 올려 별도 Spring 컨텍스트로 격리한다
  * (`PublicRateLimitEndToEndTest`와 동일 원리 — 프로퍼티 소스가 다르면 컨텍스트 캐시 키가
- * 달라져 별도 인터셉터 빈 인스턴스를 받는다). 이 클래스는 이름검색·주차검색 GET(D-B로 신규
- * rate limit 대상)·체크인 POST를 다수 호출하는 기능 테스트라, 다른 테스트 클래스와 인메모리
+ * 달라져 별도 인터셉터 빈 인스턴스를 받는다). 이 클래스는 이름검색·주차검색 GET(신규로 rate
+ * limit 대상이 됨)·체크인 POST를 다수 호출하는 기능 테스트라, 다른 테스트 클래스와 인메모리
  * rate limit 윈도(IP 키 싱글턴 상태)를 공유하면 순서에 따라 429가 섞여 함께 깨질 수 있다.
  */
 @SpringBootTest
@@ -120,7 +120,7 @@ class PublicKioskControllerTest(
             .andExpect(jsonPath("$.data.length()").value(1))
     }
 
-    // ── eid capability 게이트(D-I) ───────────────────────────────────
+    // ── eid capability 게이트 ───────────────────────────────────────
 
     @Test
     fun `존재하지 않는 eid로 이름검색하면 404를 받는다`() {
@@ -138,7 +138,7 @@ class PublicKioskControllerTest(
             .andExpect(jsonPath("$.error.code").value("EVENT_CLOSED"))
     }
 
-    // ── KIO-02 이름검색 — 3상태 + 최소필드 구조적 미노출(D-A) ──────────────
+    // ── KIO-02 이름검색 — 3상태 + 최소필드 구조적 미노출 ──────────────────
 
     @Test
     fun `이름검색은 매칭 1건이면 searchState ONE과 최소필드만 반환한다`() {
@@ -189,7 +189,7 @@ class PublicKioskControllerTest(
             .andExpect(jsonPath("$.data.length()").value(0))
     }
 
-    // ── KIO-04 체크인 — 상태전이·멱등성·최소필드(D-A) ────────────────────
+    // ── KIO-04 체크인 — 상태전이·멱등성·최소필드 ──────────────────────────
 
     @Test
     fun `체크인은 대기중 참석자를 참석으로 확정하고 좌석을 병기한다`() {
@@ -273,7 +273,7 @@ class PublicKioskControllerTest(
         ).andExpect(status().isNotFound)
     }
 
-    // ── KIO-05 주차검색 — plateTail 게이트·활성만·최소필드(D-A·H) ───────────
+    // ── KIO-05 주차검색 — plateTail 게이트·활성만·최소필드 ─────────────────
 
     @Test
     fun `주차검색은 뒷자리 4자리 매칭 시 plate와 slotDisplay만 반환한다`() {

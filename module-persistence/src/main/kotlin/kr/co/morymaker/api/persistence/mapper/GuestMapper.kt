@@ -53,14 +53,14 @@ interface GuestMapper {
     /** 대기→방문 가드 전이(매핑 성공 시). 대기 상태가 아니면 영향 0행(가드). */
     fun markVisitedIfWaiting(@Param("gid") gid: String)
 
-    /** 조건부 체크인 전이(D-F, guestId 대상) — `status != '참석'`일 때만 참석 확정. 이미 참석이면 영향 0행(가드). */
+    /** 조건부 체크인 전이(guestId 대상) — `status != '참석'`일 때만 참석 확정. 이미 참석이면 영향 0행(가드). */
     fun markAttendedIfNotAttended(
         @Param("eventId") eventId: String,
         @Param("gid") gid: String,
         @Param("visitAt") visitAt: Instant,
     ): Int
 
-    /** 조건부 체크인 전이(D-F, token 대상) — [markAttendedIfNotAttended]와 동일 가드, SCN 스캔 경로용. */
+    /** 조건부 체크인 전이(token 대상) — [markAttendedIfNotAttended]와 동일 가드, SCN 스캔 경로용. */
     fun markAttendedIfNotAttendedByToken(
         @Param("eventId") eventId: String,
         @Param("token") token: String,

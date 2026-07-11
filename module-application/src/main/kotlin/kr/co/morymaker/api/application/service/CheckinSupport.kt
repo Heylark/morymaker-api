@@ -13,7 +13,7 @@ import java.time.Instant
 
 /**
  * 가드-free 체크인 코어(SSOT) — 인증 경로([CheckinService])와 공개 kiosk 경로
- * ([PublicKioskService])가 공유하는 상태 전이(§5-3)·동시성 방어(D-F) 로직을 한 곳에 모은다
+ * ([PublicKioskService])가 공유하는 상태 전이(§5-3)·동시성 방어 로직을 한 곳에 모은다
  * ([ParkingWriteSupport] 정확한 선례).
  *
  * `EventScopeGuard`를 의도적으로 의존하지 않는다 — 이 클래스는 인가를 판단하지 않고 상태
@@ -23,10 +23,9 @@ import java.time.Instant
  * 없으므로 이 클래스 내부에서는 구조적으로 그 가드를 호출할 수 없다.
  *
  * `checkin`은 무조건 update(`guestPort.update`) 대신 조건부 UPDATE(`markAttendedIfNotAttended`/
- * `markAttendedIfNotAttendedByToken`, D-F)로 상태를 전이한다 — 무인 kiosk 더블탭 동시 요청에서도
+ * `markAttendedIfNotAttendedByToken`)로 상태를 전이한다 — 무인 kiosk 더블탭 동시 요청에서도
  * 정확히 1건만 CHECKED_IN으로 확정되도록 InnoDB PK 대상 단일 행 X-lock으로 직렬화한다
- * (`SELECT FOR UPDATE`는 매치 0건일 때 갭락 데드락을 일으킬 수 있어 의도적으로 회피 — REQ-0006
- * 실증).
+ * (`SELECT FOR UPDATE`는 매치 0건일 때 갭락 데드락을 일으킬 수 있어 의도적으로 회피).
  *
  * ⚠️ **조건부 UPDATE를 먼저 blind로 시도하고, 그 다음에만 대상을 조회한다** — 이 순서를 뒤집어
  * "먼저 조회해 이미 참석인지 확인한 뒤 조건부로 쓴다" 형태로 되돌리면 안 된다. MariaDB InnoDB

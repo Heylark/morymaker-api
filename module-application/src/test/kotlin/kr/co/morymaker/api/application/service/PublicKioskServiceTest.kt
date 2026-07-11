@@ -21,7 +21,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 /**
- * [PublicKioskService] 단위 테스트 — eid capability 게이트(D-I)·검색 게이트(D-C)·guard-free
+ * [PublicKioskService] 단위 테스트 — eid capability 게이트·검색 게이트·guard-free
  * 코어([LookupSearchSupport]·[CheckinSupport]·[ParkingRecordPort]) 위임을 검증한다. 코어
  * 자체의 매칭·상태전이 로직은 각 코어 전용 테스트(`LookupSearchSupportTest`·`CheckinSupportTest`)
  * 가 단일 검증 지점 — 여기서는 게이트·위임 경계만 확인한다.
@@ -40,7 +40,7 @@ class PublicKioskServiceTest {
         smsPolicy = null, createdAt = Instant.now(),
     )
 
-    // ── eid capability 게이트(D-I) — 3 엔드포인트 공통 ──────────────────
+    // ── eid capability 게이트 — 3 엔드포인트 공통 ────────────────────────
 
     @Test
     fun `존재하지 않는 eid는 NoSuchElementException(404)을 던진다`() {
@@ -60,7 +60,7 @@ class PublicKioskServiceTest {
         assertFailsWith<EventNotOpenException> { service.searchParking("ev1", "1234") }
     }
 
-    // ── searchAttendees(D-C 검색 게이트) ─────────────────────────────
+    // ── searchAttendees(검색 게이트) ─────────────────────────────────
 
     @Test
     fun `이름이 2자 미만이면 IllegalArgumentException을 던진다(단일문자 열거 차단)`() {
@@ -82,7 +82,7 @@ class PublicKioskServiceTest {
         verify(exactly = 1) { lookupSearchSupport.search("ev1", "김진우") }
     }
 
-    // ── checkin(D-D·F) ────────────────────────────────────────────
+    // ── checkin ───────────────────────────────────────────────────
 
     @Test
     fun `checkin은 guestId를 CheckinTarget ByGuestId로 변환해 CheckinSupport에 위임한다`() {
@@ -102,7 +102,7 @@ class PublicKioskServiceTest {
         assertEquals(CheckinTarget.ByGuestId("g1"), target.captured)
     }
 
-    // ── searchParking(D-C 검색 게이트) ────────────────────────────────
+    // ── searchParking(검색 게이트) ───────────────────────────────────
 
     @Test
     fun `plateTail이 4자리 숫자가 아니면 IllegalArgumentException을 던진다`() {

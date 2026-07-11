@@ -3,7 +3,7 @@ package kr.co.morymaker.api.dto
 import kr.co.morymaker.api.application.port.`in`.CheckinResult
 
 /**
- * 공개 kiosk 체크인 응답(KIO-04, D-A) — 구조적 미노출: `guest.id`·`visitAt`·`phone`·`plate`·
+ * 공개 kiosk 체크인 응답(KIO-04) — 구조적 미노출: `guest.id`·`visitAt`·`phone`·`plate`·
  * `parking.slotSig`는 이 shape에 애초에 필드가 없다. `parking.display`만 좌석안내(seat-guide)
  * 화면에 병기한다.
  */

@@ -17,7 +17,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
 /**
- * [CheckinSupport] 단위 테스트 — 상태 전이(§5-3)·멱등성·조건부 UPDATE 동시성 방어(D-F)를
+ * [CheckinSupport] 단위 테스트 — 상태 전이(§5-3)·멱등성·조건부 UPDATE 동시성 방어를
  * 검증한다. 가드-free 추출 이전 `CheckinServiceTest`에 있던 동일 assertion을 이전한 것(동작
  * 변경 없음, 검증 자산 이전) — 인증 경로([CheckinService])·공개 kiosk 경로
  * ([PublicKioskService])가 공유하는 SSOT라 이 테스트가 두 경로 공통 동작의 단일 검증 지점이다.

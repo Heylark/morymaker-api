@@ -16,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional
  * 전용)과 멱등 재조회 응답 계약이 CRUD와 달라서다.
  *
  * 행사 스코프 검증([EventScopeGuard.assertAccess])만 수행하고, 실제 상태 전이 코어(§5-3 +
- * 동시성 방어 D-F)는 [CheckinSupport](가드-free, 공개 kiosk 경로와 공유하는 SSOT)에 위임한다 —
+ * 동시성 방어)는 [CheckinSupport](가드-free, 공개 kiosk 경로와 공유하는 SSOT)에 위임한다 —
  * 인증 여부만 다른 두 진입점이 동일한 체크인 로직을 재사용한다.
  */
 @Service
