@@ -38,7 +38,7 @@ class Event(
     val titleColor: String?,
     val bodyColor: String?,
     val kv: String?,
-    val defaultIdleMode: String?,
+    val defaultIdleMode: String? = null,
     val smsPolicy: String?,
     val createdAt: Instant,
 ) {
