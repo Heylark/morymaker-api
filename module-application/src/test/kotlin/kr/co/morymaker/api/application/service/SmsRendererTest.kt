@@ -69,4 +69,14 @@ class SmsRendererTest {
             SmsRenderer.VARIABLES,
         )
     }
+
+    @Test
+    fun `render는 참석자 데이터에 박힌 토큰을 2차 치환하지 않는다`() {
+        val body = "[\$참석자]님, 링크: [\$QR링크]"
+        val guest = sampleGuest(name = "홍길동[\$QR링크]", token = "zzz999")
+
+        val rendered = SmsRenderer.render(body, guest, sampleEvent(), "https://event.morymaker.co.kr")
+
+        assertEquals("홍길동[\$QR링크]님, 링크: https://event.morymaker.co.kr/u/zzz999", rendered)
+    }
 }
