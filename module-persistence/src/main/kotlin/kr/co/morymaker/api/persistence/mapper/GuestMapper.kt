@@ -5,6 +5,7 @@ import kr.co.morymaker.api.application.port.out.GuestSearchQuery
 import kr.co.morymaker.api.domain.guest.Guest
 import org.apache.ibatis.annotations.Mapper
 import org.apache.ibatis.annotations.Param
+import java.time.Instant
 
 /**
  * guest 테이블 MyBatis 매퍼 인터페이스.
@@ -51,6 +52,20 @@ interface GuestMapper {
 
     /** 대기→방문 가드 전이(매핑 성공 시). 대기 상태가 아니면 영향 0행(가드). */
     fun markVisitedIfWaiting(@Param("gid") gid: String)
+
+    /** 조건부 체크인 전이(D-F, guestId 대상) — `status != '참석'`일 때만 참석 확정. 이미 참석이면 영향 0행(가드). */
+    fun markAttendedIfNotAttended(
+        @Param("eventId") eventId: String,
+        @Param("gid") gid: String,
+        @Param("visitAt") visitAt: Instant,
+    ): Int
+
+    /** 조건부 체크인 전이(D-F, token 대상) — [markAttendedIfNotAttended]와 동일 가드, SCN 스캔 경로용. */
+    fun markAttendedIfNotAttendedByToken(
+        @Param("eventId") eventId: String,
+        @Param("token") token: String,
+        @Param("visitAt") visitAt: Instant,
+    ): Int
 
     /** plate 백필 — 기존 값이 비어 있을 때만 갱신(가드). */
     fun backfillPlateIfEmpty(@Param("gid") gid: String, @Param("plate") plate: String)
