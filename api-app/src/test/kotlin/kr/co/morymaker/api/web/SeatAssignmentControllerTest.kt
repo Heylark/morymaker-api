@@ -244,16 +244,10 @@ class SeatAssignmentControllerTest(
             .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
     }
 
-    // 발견(설계 가정 이탈, tech-debt 등록) — 02-architect §4는 "소수·문자·범위밖 ord
-    // 거부(DTO 타입이 Int라 원천 거부)"를 주장하나, 실측 결과 Jackson 기본 설정(ACCEPT_FLOAT_AS_INT
-    // 활성)이 소수를 거부하지 않고 **말단 절삭**한다(1.5 → 1). "문자"·터무니없는 범위 초과(Long
-    // 오버플로 등)는 실제로 400을 받지만 "소수"만 절삭되어 통과한다 — DB 컬럼은 항상 유효 정수만
-    // 저장되므로 데이터 무결성 위반은 없다(단일 배정 등 우연히 유효값으로 절삭되는 경우 200으로
-    // 통과할 뿐, 저장값이 깨지지는 않음).
     @Test
-    fun `replace는 소수 ord를 거부하지 않고 절삭된 정수로 저장한다(설계 가정과 실제 동작 불일치 — tech-debt 등록)`() {
+    fun `replace는 소수 ord이면 400 VALIDATION_FAILED를 받는다`() {
         val eid = createEvent()
-        val (gid, groupNo) = createGroup(eid, "A열", numbering = true)
+        val (_, groupNo) = createGroup(eid, "A열", numbering = true)
         val g1 = registerGuest(eid, "박서연")
 
         mockMvc.perform(
@@ -261,14 +255,9 @@ class SeatAssignmentControllerTest(
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"groupNo":$groupNo,"assignments":[{"ord":1.9,"guestId":"$g1"}]}"""),
-        ).andExpect(status().isOk)
-
-        val ord = jdbcTemplate.queryForObject(
-            "SELECT ord FROM seat_assignment WHERE seat_group_id = ? AND guest_id = ?",
-            Int::class.java,
-            gid, g1,
         )
-        kotlin.test.assertEquals(1, ord, "1.9는 거부되지 않고 1로 절삭 저장된다(Jackson ACCEPT_FLOAT_AS_INT 기본값)")
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
     }
 
     // ── assignedElsewhere 사전검사 — 409 ────────────────────────────
