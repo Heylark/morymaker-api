@@ -24,5 +24,14 @@ class WebMvcConfig(
         // 자리 QR 셀프 주차(§10-4) — GET(상태 조회)·POST(셀프 등록) 모두 매칭되지만 위와 동일하게
         // 인터셉터 내부에서 POST만 검사한다. 단측 additive(이 파일 외 공유 설정 변경 없음).
         registry.addInterceptor(publicRateLimitInterceptor).addPathPatterns("/api/public/p/**")
+        // kiosk 개별 엔드포인트만 명시 등록(broad "/api/public/events/**" 아님) — idle-contents 등
+        // 그 외 kiosk 하위 공개 조회는 이 인터셉터 자체가 호출되지 않는다. 이름검색·주차검색은
+        // GET이지만(인터셉터 내부 KIOSK_PATH_PREFIX 분기로 검사 대상), 체크인은 POST라 이미
+        // 검사 대상이다 — 3개를 모두 명시해 등록 경로를 한눈에 드러낸다.
+        registry.addInterceptor(publicRateLimitInterceptor).addPathPatterns(
+            "/api/public/events/*/attendees/**",
+            "/api/public/events/*/checkin/**",
+            "/api/public/events/*/parking-search/**",
+        )
     }
 }
