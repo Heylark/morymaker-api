@@ -90,7 +90,7 @@ class ParkingWriteSupportTest {
         assertNull(result.supersededRecord)
         assertFalse(result.mapping.matched)
         verify(exactly = 1) { recordPort.insert(any()) }
-        verify(exactly = 0) { recordPort.checkout(any()) }
+        verify(exactly = 0) { recordPort.checkout(any(), any()) }
         verify(exactly = 0) { recordPort.updateSlotMove(any()) }
     }
 
@@ -110,7 +110,7 @@ class ParkingWriteSupportTest {
         val active = sampleRecord(id = "r1", plate = "12가3456")
         every { recordPort.selectActiveBySlot("ev1", active.slotSig) } returns active
         every { recordPort.selectActiveByPlate("ev1", "12가3456") } returns active
-        every { recordPort.touchRegisteredAt("r1") } returns Unit
+        every { recordPort.touchRegisteredAt("ev1", "r1") } returns Unit
         every { recordPort.fetchById("ev1", "r1") } returns active
         stubNoMapping()
 
@@ -118,9 +118,9 @@ class ParkingWriteSupportTest {
 
         assertEquals(RegisterParkingResult.RESULT_RE_REGISTERED, result.result)
         assertEquals("본인 재등록 — 위치 갱신", result.message)
-        verify(exactly = 1) { recordPort.touchRegisteredAt("r1") }
+        verify(exactly = 1) { recordPort.touchRegisteredAt("ev1", "r1") }
         verify(exactly = 0) { recordPort.insert(any()) }
-        verify(exactly = 0) { recordPort.checkout(any()) }
+        verify(exactly = 0) { recordPort.checkout(any(), any()) }
     }
 
     // ── 케이스 B: 승계(타 차량, 신규) ─────────────────────────────
@@ -130,7 +130,7 @@ class ParkingWriteSupportTest {
         val occupied = sampleRecord(id = "old", plate = "99나9999")
         every { recordPort.selectActiveBySlot("ev1", occupied.slotSig) } returns occupied
         every { recordPort.selectActiveByPlate("ev1", "12가3456") } returns null
-        every { recordPort.checkout("old") } returns Unit
+        every { recordPort.checkout("ev1", "old") } returns Unit
         val inserted = slot<ParkingRecord>()
         every { recordPort.insert(capture(inserted)) } returns Unit
         stubNoMapping()
@@ -141,7 +141,7 @@ class ParkingWriteSupportTest {
         assertTrue(inserted.captured.reviewNeeded)
         assertEquals("old", result.supersededRecord?.id)
         assertEquals(ParkingRecord.STATUS_CHECKED_OUT, result.supersededRecord?.status)
-        verify(exactly = 1) { recordPort.checkout("old") }
+        verify(exactly = 1) { recordPort.checkout("ev1", "old") }
         verify(exactly = 1) { recordPort.insert(any()) }
     }
 
@@ -153,7 +153,7 @@ class ParkingWriteSupportTest {
         val myOther = sampleRecord(id = "mine", slotSig = "지하 2층·A구역·9", plate = "12가3456")
         every { recordPort.selectActiveBySlot("ev1", occupied.slotSig) } returns occupied
         every { recordPort.selectActiveByPlate("ev1", "12가3456") } returns myOther
-        every { recordPort.checkout("old") } returns Unit
+        every { recordPort.checkout("ev1", "old") } returns Unit
         val moved = slot<ParkingRecord>()
         every { recordPort.updateSlotMove(capture(moved)) } returns Unit
         stubNoMapping()
@@ -165,7 +165,7 @@ class ParkingWriteSupportTest {
         assertEquals(occupied.slotSig, moved.captured.slotSig)
         assertTrue(moved.captured.reviewNeeded)
         assertEquals("old", result.supersededRecord?.id)
-        verify(exactly = 1) { recordPort.checkout("old") }
+        verify(exactly = 1) { recordPort.checkout("ev1", "old") }
         verify(exactly = 1) { recordPort.updateSlotMove(any()) }
         verify(exactly = 0) { recordPort.insert(any()) }
     }
@@ -187,7 +187,7 @@ class ParkingWriteSupportTest {
         assertEquals("지하 2층·A구역·3", moved.captured.slotSig)
         assertFalse(moved.captured.reviewNeeded)
         assertNull(result.supersededRecord)
-        verify(exactly = 0) { recordPort.checkout(any()) }
+        verify(exactly = 0) { recordPort.checkout(any(), any()) }
         verify(exactly = 0) { recordPort.insert(any()) }
     }
 
@@ -201,16 +201,16 @@ class ParkingWriteSupportTest {
         every { recordPort.insert(capture(inserted)) } returns Unit
         every { guestLinkPort.findGuestByPlateOrPhone("ev1", "12가3456", "010-1234-5678") } returns
             GuestLink(guestId = "g1", guestName = "김민준", guestStatus = "대기")
-        every { recordPort.linkGuest(any(), "g1") } returns Unit
-        every { guestLinkPort.markVisitedAndBackfillPlate("g1", "12가3456") } returns Unit
+        every { recordPort.linkGuest(any(), any(), "g1") } returns Unit
+        every { guestLinkPort.markVisitedAndBackfillPlate("ev1", "g1", "12가3456") } returns Unit
 
         val result = support.register("ev1", sampleCommand())
 
         assertTrue(result.mapping.matched)
         assertEquals("g1", result.mapping.guestId)
         assertEquals("방문", result.mapping.guestStatus)
-        verify(exactly = 1) { recordPort.linkGuest(inserted.captured.id, "g1") }
-        verify(exactly = 1) { guestLinkPort.markVisitedAndBackfillPlate("g1", "12가3456") }
+        verify(exactly = 1) { recordPort.linkGuest("ev1", inserted.captured.id, "g1") }
+        verify(exactly = 1) { guestLinkPort.markVisitedAndBackfillPlate("ev1", "g1", "12가3456") }
     }
 
     @Test
@@ -223,8 +223,8 @@ class ParkingWriteSupportTest {
         val result = support.register("ev1", sampleCommand())
 
         assertFalse(result.mapping.matched)
-        verify(exactly = 0) { recordPort.linkGuest(any(), any()) }
-        verify(exactly = 0) { guestLinkPort.markVisitedAndBackfillPlate(any(), any()) }
+        verify(exactly = 0) { recordPort.linkGuest(any(), any(), any()) }
+        verify(exactly = 0) { guestLinkPort.markVisitedAndBackfillPlate(any(), any(), any()) }
     }
 
     // ── 구조적 무인증 보장 ────────────────────────────────────────

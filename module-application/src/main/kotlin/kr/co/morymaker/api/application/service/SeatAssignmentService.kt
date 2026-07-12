@@ -94,8 +94,8 @@ internal class SeatAssignmentService(
 
         val newGuestIds = nonNullGuestIds.toSet()
         val removedGuestIds = previousGuestIds.filterNot { it in newGuestIds }
-        if (removedGuestIds.isNotEmpty()) guestSeatLinkPort.updateSeatGroupId(removedGuestIds, null)
-        if (nonNullGuestIds.isNotEmpty()) guestSeatLinkPort.updateSeatGroupId(nonNullGuestIds, group.id)
+        if (removedGuestIds.isNotEmpty()) guestSeatLinkPort.updateSeatGroupId(eventId, removedGuestIds, null)
+        if (nonNullGuestIds.isNotEmpty()) guestSeatLinkPort.updateSeatGroupId(eventId, nonNullGuestIds, group.id)
 
         val refreshed = assignmentPort.findByGroup(eventId, group.id, offset = null, limit = null)
         return refreshed.map { it.toView(group.groupNo) }

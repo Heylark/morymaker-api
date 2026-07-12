@@ -18,6 +18,8 @@ import org.apache.ibatis.annotations.Param
 interface ParkingRecordMapper {
 
     // ❄️ 동결 — 시그니처·SQL 불변(guest→parking 교차 최소 SPI, GuestService·CheckinService 의존).
+    // 단 linkGuest는 cross-event 격리 방어심층 봉인을 위해 이 동결 결정을 재검토·해제했다(eventId
+    // 파라미터 추가) — 나머지 2개 scalar 읽기는 이미 event_id를 보유하므로 시그니처·SQL 불변 유지.
 
     /** 역방향 지연매칭(§4-10) — 활성('주차중') 주차기록 id. 없으면 null. */
     fun selectActiveRecordIdByPlate(@Param("eventId") eventId: String, @Param("plate") plate: String): String?
@@ -25,8 +27,8 @@ interface ParkingRecordMapper {
     /** 체크인 응답 병기(§5-1) — guest에 연결된 활성 slot_sig. 없으면 null. */
     fun selectActiveSlotSigByGuestId(@Param("eventId") eventId: String, @Param("guestId") guestId: String): String?
 
-    /** guest_id 백필 — §6 매핑(3-7)도 이 메서드를 그대로 재사용한다(의미 동일: guest_id UPDATE). */
-    fun linkGuest(@Param("recordId") recordId: String, @Param("guestId") guestId: String)
+    /** guest_id 백필 — §6 매핑(3-7)도 이 메서드를 그대로 재사용한다(의미 동일: guest_id UPDATE). eventId는 cross-event 격리 방어심층. */
+    fun linkGuest(@Param("eventId") eventId: String, @Param("recordId") recordId: String, @Param("guestId") guestId: String)
 
     // ➕ §6 신규 — parking_record 전체 CRUD(zone·record 수직 신설).
 
@@ -48,12 +50,12 @@ interface ParkingRecordMapper {
     /** 자리 이동(§4-1 케이스 C·D) — slot_sig·zone_id·review_needed·guest_id 갱신. */
     fun updateSlotMove(record: ParkingRecord)
 
-    /** 본인 재등록(§4-1 케이스 A) — registered_at만 현재 시각으로 갱신. */
-    fun touchRegisteredAt(@Param("id") id: String)
+    /** 본인 재등록(§4-1 케이스 A) — registered_at만 현재 시각으로 갱신. eventId는 cross-event 격리 방어심층. */
+    fun touchRegisteredAt(@Param("eventId") eventId: String, @Param("id") id: String)
 
-    /** 출차(§6-7) — status→출차(active_key NULL화). */
-    fun checkout(@Param("id") id: String)
+    /** 출차(§6-7) — status→출차(active_key NULL화). eventId는 cross-event 격리 방어심층. */
+    fun checkout(@Param("eventId") eventId: String, @Param("id") id: String)
 
-    /** 승계 확인 배지 해제(§6-8) — review_needed→0. */
-    fun clearReview(@Param("id") id: String)
+    /** 승계 확인 배지 해제(§6-8) — review_needed→0. eventId는 cross-event 격리 방어심층. */
+    fun clearReview(@Param("eventId") eventId: String, @Param("id") id: String)
 }

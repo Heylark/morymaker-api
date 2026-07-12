@@ -67,7 +67,7 @@ internal class GuestWriteSupport(
         val plate = guest.plate
         if (plate.isNullOrBlank()) return guest
         val recordId = parkingLinkPort.findActiveRecordIdByPlate(eventId, normalizePlate(plate)) ?: return guest
-        parkingLinkPort.linkGuest(recordId, guest.id)
+        parkingLinkPort.linkGuest(eventId, recordId, guest.id)
         val updated = if (guest.status == Guest.STATUS_WAITING) {
             guest.with(status = Guest.STATUS_VISITED, visitAt = Instant.now())
         } else {

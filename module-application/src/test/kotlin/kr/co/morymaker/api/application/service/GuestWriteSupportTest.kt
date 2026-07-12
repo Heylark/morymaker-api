@@ -72,7 +72,7 @@ class GuestWriteSupportTest {
         every { guestPort.existsByToken(any()) } returns false
         every { guestPort.insert(any()) } returns Unit
         every { parkingLinkPort.findActiveRecordIdByPlate("ev1", "123가4568") } returns "record-1"
-        every { parkingLinkPort.linkGuest("record-1", any()) } returns Unit
+        every { parkingLinkPort.linkGuest("ev1", "record-1", any()) } returns Unit
         every { guestPort.update(any()) } returns Unit
 
         val command = RegisterGuestCommand(
@@ -83,7 +83,7 @@ class GuestWriteSupportTest {
 
         assertEquals(Guest.STATUS_VISITED, result.status)
         assertNotNull(result.visitAt)
-        verify(exactly = 1) { parkingLinkPort.linkGuest("record-1", result.id) }
+        verify(exactly = 1) { parkingLinkPort.linkGuest("ev1", "record-1", result.id) }
         verify(exactly = 1) { guestPort.update(any()) }
     }
 
@@ -125,7 +125,7 @@ class GuestWriteSupportTest {
         val existing = sampleGuest(plate = null, status = Guest.STATUS_WAITING)
         every { guestPort.update(any()) } returns Unit
         every { parkingLinkPort.findActiveRecordIdByPlate("ev1", "12가3456") } returns "record-2"
-        every { parkingLinkPort.linkGuest("record-2", "g1") } returns Unit
+        every { parkingLinkPort.linkGuest("ev1", "record-2", "g1") } returns Unit
 
         val result = support.backfillPlate("ev1", existing, "12가3456")
 

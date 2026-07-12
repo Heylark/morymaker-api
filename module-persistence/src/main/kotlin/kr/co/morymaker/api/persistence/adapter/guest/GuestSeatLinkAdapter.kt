@@ -22,7 +22,7 @@ internal class GuestSeatLinkAdapter(
         return guestMapper.selectExistingIds(eventId, guestIds).toSet()
     }
 
-    override fun updateSeatGroupId(guestIds: List<String>, seatGroupId: String?) {
-        if (guestIds.isNotEmpty()) guestMapper.updateSeatGroupId(guestIds, seatGroupId)
+    override fun updateSeatGroupId(eventId: String, guestIds: List<String>, seatGroupId: String?) {
+        if (guestIds.isNotEmpty()) guestMapper.updateSeatGroupId(eventId, guestIds, seatGroupId)
     }
 }

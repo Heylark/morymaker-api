@@ -28,17 +28,17 @@ interface ParkingRecordPort {
     /** 자리 이동(§4-1 케이스 C·D) — slot_sig·zone_id·review_needed·guest_id 갱신. */
     fun updateSlotMove(record: ParkingRecord)
 
-    /** 본인 재등록(§4-1 케이스 A) — 위치 재표시, registered_at만 현재 시각으로 갱신. */
-    fun touchRegisteredAt(id: String)
+    /** 본인 재등록(§4-1 케이스 A) — 위치 재표시, registered_at만 현재 시각으로 갱신. eventId는 cross-event 격리 방어심층. */
+    fun touchRegisteredAt(eventId: String, id: String)
 
-    /** 출차(§6-7) — status→출차(active_key NULL화). */
-    fun checkout(id: String)
+    /** 출차(§6-7) — status→출차(active_key NULL화). eventId는 cross-event 격리 방어심층. */
+    fun checkout(eventId: String, id: String)
 
-    /** 승계 확인 배지 해제(§6-8) — review_needed→0. */
-    fun clearReview(id: String)
+    /** 승계 확인 배지 해제(§6-8) — review_needed→0. eventId는 cross-event 격리 방어심층. */
+    fun clearReview(eventId: String, id: String)
 
-    /** parking→guest 매핑(3-7) 성공 시 guest_id 백필. */
-    fun linkGuest(recordId: String, guestId: String)
+    /** parking→guest 매핑(3-7) 성공 시 guest_id 백필. eventId는 cross-event 격리 방어심층. */
+    fun linkGuest(eventId: String, recordId: String, guestId: String)
 }
 
 /** [ParkingRecordPort.search] 조건(§6-5). `plateTail`은 뒷자리 4자리 계약(LIKE 접미 매칭). */

@@ -99,7 +99,7 @@ class ParkingZoneServiceTest {
         val result = service.updateZone("ev1", "z1", command)
 
         assertEquals(mapOf("3" to "귀빈석"), result.titleOverrides)
-        verify(exactly = 0) { slotTitlePort.deleteByZoneId(any()) }
+        verify(exactly = 0) { slotTitlePort.deleteByZoneId(any(), any()) }
         verify(exactly = 0) { slotTitlePort.insertBatch(any()) }
     }
 
@@ -108,7 +108,7 @@ class ParkingZoneServiceTest {
         every { eventScopeGuard.assertAccess("ev1") } returns Unit
         every { zonePort.fetchById("ev1", "z1") } returns sampleZone(id = "z1")
         every { zonePort.update(any()) } returns Unit
-        every { slotTitlePort.deleteByZoneId("z1") } returns Unit
+        every { slotTitlePort.deleteByZoneId("ev1", "z1") } returns Unit
         val insertedRows = slot<List<ParkingSlotTitle>>()
         every { slotTitlePort.insertBatch(capture(insertedRows)) } returns Unit
 
@@ -119,7 +119,7 @@ class ParkingZoneServiceTest {
         )
         val result = service.updateZone("ev1", "z1", command)
 
-        verify(exactly = 1) { slotTitlePort.deleteByZoneId("z1") }
+        verify(exactly = 1) { slotTitlePort.deleteByZoneId("ev1", "z1") }
         // "abc"는 정수 파싱 실패로, "7"은 빈 문자열이라 각각 걸러진다 — 2건만 삽입.
         assertEquals(2, insertedRows.captured.size)
         assertEquals(mapOf("3" to "귀빈석", "5" to "VIP"), result.titleOverrides)
@@ -130,7 +130,7 @@ class ParkingZoneServiceTest {
         every { eventScopeGuard.assertAccess("ev1") } returns Unit
         every { zonePort.fetchById("ev1", "z1") } returns sampleZone(id = "z1")
         every { zonePort.update(any()) } returns Unit
-        every { slotTitlePort.deleteByZoneId("z1") } returns Unit
+        every { slotTitlePort.deleteByZoneId("ev1", "z1") } returns Unit
 
         val command = ZoneUpdateCommand(
             part1 = "지하 2층", part2 = "A구역", part3 = null, part4 = null,
@@ -138,7 +138,7 @@ class ParkingZoneServiceTest {
         )
         val result = service.updateZone("ev1", "z1", command)
 
-        verify(exactly = 1) { slotTitlePort.deleteByZoneId("z1") }
+        verify(exactly = 1) { slotTitlePort.deleteByZoneId("ev1", "z1") }
         verify(exactly = 0) { slotTitlePort.insertBatch(any()) }
         assertTrue(result.titleOverrides.isEmpty())
     }

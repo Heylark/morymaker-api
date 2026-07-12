@@ -21,8 +21,8 @@ interface ParkingSlotTitleMapper {
     /** 행사 전체 override — 목록(§6-1) N+1 회피 일괄 조회(parking_zone JOIN으로 event 격리). */
     fun findByEventId(@Param("eventId") eventId: String): List<ParkingSlotTitle>
 
-    /** zone_id 기준 전삭제(§6-3 delete-insert 1단계). */
-    fun deleteByZoneId(@Param("zoneId") zoneId: String)
+    /** zone_id 기준 전삭제(§6-3 delete-insert 1단계). eventId는 parking_zone EXISTS 서브쿼리를 통한 cross-event 격리 방어심층(직접 컬럼 없음). */
+    fun deleteByZoneId(@Param("eventId") eventId: String, @Param("zoneId") zoneId: String)
 
     /** 재삽입(§6-3 delete-insert 2단계, foreach 배치). */
     fun insertBatch(@Param("list") titles: List<ParkingSlotTitle>)

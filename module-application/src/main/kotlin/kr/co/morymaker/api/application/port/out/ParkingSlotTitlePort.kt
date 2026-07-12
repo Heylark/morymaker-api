@@ -16,8 +16,8 @@ interface ParkingSlotTitlePort {
     /** 행사 전체 override — 목록(§6-1) N+1 회피용 일괄 조회(parking_zone JOIN으로 event 격리). */
     fun findByEventId(eventId: String): List<ParkingSlotTitle>
 
-    /** zone_id 기준 전삭제(§6-3 delete-insert 1단계). */
-    fun deleteByZoneId(zoneId: String)
+    /** zone_id 기준 전삭제(§6-3 delete-insert 1단계). eventId는 cross-event 격리 방어심층 스코핑용(parking_zone EXISTS 서브쿼리 경유). */
+    fun deleteByZoneId(eventId: String, zoneId: String)
 
     /** 재삽입(§6-3 delete-insert 2단계). 빈 리스트면 호출하지 않아도 안전(no-op)해야 한다. */
     fun insertBatch(titles: List<ParkingSlotTitle>)

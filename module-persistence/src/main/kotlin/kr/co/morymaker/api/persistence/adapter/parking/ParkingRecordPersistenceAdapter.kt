@@ -33,12 +33,13 @@ internal class ParkingRecordPersistenceAdapter(
 
     override fun updateSlotMove(record: ParkingRecord) = recordMapper.updateSlotMove(record)
 
-    override fun touchRegisteredAt(id: String) = recordMapper.touchRegisteredAt(id)
+    override fun touchRegisteredAt(eventId: String, id: String) = recordMapper.touchRegisteredAt(eventId, id)
 
-    override fun checkout(id: String) = recordMapper.checkout(id)
+    override fun checkout(eventId: String, id: String) = recordMapper.checkout(eventId, id)
 
-    override fun clearReview(id: String) = recordMapper.clearReview(id)
+    override fun clearReview(eventId: String, id: String) = recordMapper.clearReview(eventId, id)
 
     // 기존 동결 scalar linkGuest를 그대로 재사용한다(02-architect §6 — 의미 동일: guest_id UPDATE).
-    override fun linkGuest(recordId: String, guestId: String) = recordMapper.linkGuest(recordId, guestId)
+    override fun linkGuest(eventId: String, recordId: String, guestId: String) =
+        recordMapper.linkGuest(eventId, recordId, guestId)
 }

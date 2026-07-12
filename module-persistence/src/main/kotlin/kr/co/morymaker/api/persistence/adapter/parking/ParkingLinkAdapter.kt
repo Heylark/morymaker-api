@@ -23,5 +23,6 @@ internal class ParkingLinkAdapter(
     override fun findActiveSlotByGuestId(eventId: String, guestId: String): ParkingSlotRef? =
         parkingRecordMapper.selectActiveSlotSigByGuestId(eventId, guestId)?.let { ParkingSlotRef(it) }
 
-    override fun linkGuest(recordId: String, guestId: String) = parkingRecordMapper.linkGuest(recordId, guestId)
+    override fun linkGuest(eventId: String, recordId: String, guestId: String) =
+        parkingRecordMapper.linkGuest(eventId, recordId, guestId)
 }

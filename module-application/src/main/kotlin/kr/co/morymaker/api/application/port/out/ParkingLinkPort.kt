@@ -13,8 +13,8 @@ interface ParkingLinkPort {
     /** 체크인 응답 주차 병기(§5-1) — guest에 연결된 활성 slot. 없으면 null. */
     fun findActiveSlotByGuestId(eventId: String, guestId: String): ParkingSlotRef?
 
-    /** `parking_record.guest_id` 백필. */
-    fun linkGuest(recordId: String, guestId: String)
+    /** `parking_record.guest_id` 백필. eventId는 cross-event 격리 방어심층 스코핑용. */
+    fun linkGuest(eventId: String, recordId: String, guestId: String)
 }
 
 /** 체크인 응답의 주차 위치 display 최소 파생용. */

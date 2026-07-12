@@ -263,12 +263,17 @@
         LIMIT 1
     </select>
 
-    <!-- 대기→방문 가드 전이 — 대기 상태가 아니면 WHERE에서 걸러져 영향 0행(멱등). -->
+    <!--
+        대기→방문 가드 전이 — 대기 상태가 아니면 WHERE에서 걸러져 영향 0행(멱등). event_id 조건은
+        cross-event 격리 방어심층(belt-and-suspenders) — 서비스가 이미 event 스코프 gid만 넘기므로
+        정상 케이스 동작은 불변이고, 위조된 타 행사 gid만 신규로 0행 매칭되어 차단된다.
+    -->
     <update id="markVisitedIfWaiting">
         UPDATE guest
            SET status = '방문'
              , visit_at = NOW()
          WHERE id = #{gid}
+           AND event_id = #{eventId}
            AND status = '대기'
     </update>
 
@@ -302,11 +307,12 @@
            AND status != '참석'
     </update>
 
-    <!-- plate 백필 — 기존 값이 비어 있을 때만 갱신(가드). -->
+    <!-- plate 백필 — 기존 값이 비어 있을 때만 갱신(가드). event_id 조건은 cross-event 격리 방어심층(위 markVisitedIfWaiting과 동일 근거). -->
     <update id="backfillPlateIfEmpty">
         UPDATE guest
            SET plate = #{plate}
          WHERE id = #{gid}
+           AND event_id = #{eventId}
            AND (plate IS NULL OR plate = '')
     </update>
 
@@ -323,11 +329,12 @@
         </foreach>
     </select>
 
-    <!-- guest.seat_group_id 일괄 갱신(§12-5 M3 동기화) — seatGroupId가 null이면 배정 해제. -->
+    <!-- guest.seat_group_id 일괄 갱신(§12-5 M3 동기화) — seatGroupId가 null이면 배정 해제. event_id 조건은 cross-event 격리 방어심층(위 markVisitedIfWaiting과 동일 근거). -->
     <update id="updateSeatGroupId">
         UPDATE guest
            SET seat_group_id = #{seatGroupId}
-         WHERE id IN
+         WHERE event_id = #{eventId}
+           AND id IN
         <foreach collection="guestIds" item="gid" open="(" separator="," close=")">
             #{gid}
         </foreach>

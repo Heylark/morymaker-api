@@ -47,13 +47,13 @@ internal class ParkingWriteSupport(
         val outcome = when {
             // 케이스 A — 본인 재등록(동일 자리): 대상 점유자가 요청 차량 본인.
             targetActive != null && targetActive.plate == normPlate -> {
-                recordPort.touchRegisteredAt(targetActive.id)
+                recordPort.touchRegisteredAt(eventId, targetActive.id)
                 val touched = recordPort.fetchById(eventId, targetActive.id) ?: targetActive
                 Outcome(RegisterParkingResult.RESULT_RE_REGISTERED, touched, superseded = null)
             }
             // 케이스 B — 승계(타 차량, 신규): 대상 점유, 요청 차량은 다른 활성 기록 없음.
             targetActive != null && plateActive == null -> {
-                recordPort.checkout(targetActive.id)
+                recordPort.checkout(eventId, targetActive.id)
                 val newRecord = buildNewRecord(eventId, command, normPlate, reviewNeeded = true)
                 guardingSlotUniqueness { recordPort.insert(newRecord) }
                 val superseded = targetActive.with(status = ParkingRecord.STATUS_CHECKED_OUT)
@@ -61,7 +61,7 @@ internal class ParkingWriteSupport(
             }
             // 케이스 C — 승계+이동(타 차량, 요청 차량이 다른 자리에 이미 활성): 대상 출차 + 내 기록 이동.
             targetActive != null -> {
-                recordPort.checkout(targetActive.id)
+                recordPort.checkout(eventId, targetActive.id)
                 val moved = plateActive!!.with(slotSig = command.slotSig, zoneId = command.zoneId, reviewNeeded = true)
                 guardingSlotUniqueness { recordPort.updateSlotMove(moved) }
                 val superseded = targetActive.with(status = ParkingRecord.STATUS_CHECKED_OUT)
@@ -128,8 +128,8 @@ internal class ParkingWriteSupport(
      */
     private fun mapGuestForRecord(eventId: String, record: ParkingRecord, phone: String?): MappingResult {
         val match = guestLinkPort.findGuestByPlateOrPhone(eventId, record.plate, phone) ?: return MappingResult(matched = false)
-        recordPort.linkGuest(record.id, match.guestId)
-        guestLinkPort.markVisitedAndBackfillPlate(match.guestId, record.plate)
+        recordPort.linkGuest(eventId, record.id, match.guestId)
+        guestLinkPort.markVisitedAndBackfillPlate(eventId, match.guestId, record.plate)
         val guestStatus = if (match.guestStatus == "대기") "방문" else match.guestStatus
         return MappingResult(matched = true, guestId = match.guestId, guestName = match.guestName, guestStatus = guestStatus)
     }

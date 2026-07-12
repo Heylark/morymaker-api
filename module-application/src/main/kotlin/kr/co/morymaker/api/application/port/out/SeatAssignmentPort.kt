@@ -32,17 +32,17 @@ interface SeatAssignmentPort {
     /** 신규 배정 세트 일괄 삽입(§12-5 M1 원자 교체 2단계). 빈 리스트는 무동작(호출 전 가드는 Adapter 책임). */
     fun insertBatch(rows: List<SeatAssignment>)
 
-    /** M4 ON→OFF 1단계 — 빈 좌석(guest_id IS NULL) 행 삭제. */
-    fun deleteEmptySeats(seatGroupId: String)
+    /** M4 ON→OFF 1단계 — 빈 좌석(guest_id IS NULL) 행 삭제. eventId는 cross-event 격리 방어심층 스코핑용. */
+    fun deleteEmptySeats(eventId: String, seatGroupId: String)
 
-    /** M4 ON→OFF 2단계 — 남은 멤버 ord 일괄 갱신([SeatAssignment.ORD_UNNUMBERED]). */
-    fun updateOrdForGroup(seatGroupId: String, ord: Int)
+    /** M4 ON→OFF 2단계 — 남은 멤버 ord 일괄 갱신([SeatAssignment.ORD_UNNUMBERED]). eventId는 cross-event 격리 방어심층 스코핑용. */
+    fun updateOrdForGroup(eventId: String, seatGroupId: String, ord: Int)
 
     /** M4 OFF→ON 1단계 — 멤버 안정 정렬(guest name 오름차순, tiebreak id) 조회. */
     fun findMembersOrderedByGuestName(seatGroupId: String): List<SeatAssignment>
 
-    /** M4 OFF→ON 2단계 — 단건 ord 갱신(재채번 적용). */
-    fun updateOrd(id: String, ord: Int)
+    /** M4 OFF→ON 2단계 — 단건 ord 갱신(재채번 적용). eventId는 cross-event 격리 방어심층 스코핑용. */
+    fun updateOrd(eventId: String, id: String, ord: Int)
 }
 
 /** [SeatAssignmentPort.countsByGroup] 결과 1건(§12-1 assignedCount·slotCount). */

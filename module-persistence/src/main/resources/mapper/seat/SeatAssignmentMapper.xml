@@ -133,18 +133,23 @@
         </foreach>
     </insert>
 
-    <!-- M4 ON→OFF 1단계 — 빈 좌석(번호만 점유, 미배정) 행 삭제. -->
+    <!--
+        M4 ON→OFF 1단계 — 빈 좌석(번호만 점유, 미배정) 행 삭제. event_id는 직접 컬럼(V1
+        idx_seat_event)이라 JOIN 불요 — cross-event 격리 방어심층(위 deleteByGroup 선례와 동일 패턴).
+    -->
     <delete id="deleteEmptySeats">
         DELETE FROM seat_assignment
-        WHERE seat_group_id = #{seatGroupId}
+        WHERE event_id = #{eventId}
+          AND seat_group_id = #{seatGroupId}
           AND guest_id IS NULL
     </delete>
 
-    <!-- M4 ON→OFF 2단계 — 남은 멤버(guest_id IS NOT NULL, 빈 좌석은 1단계에서 이미 삭제됨) ord 일괄 갱신. -->
+    <!-- M4 ON→OFF 2단계 — 남은 멤버(guest_id IS NOT NULL, 빈 좌석은 1단계에서 이미 삭제됨) ord 일괄 갱신. event_id는 cross-event 격리 방어심층. -->
     <update id="updateOrdForGroup">
         UPDATE seat_assignment
            SET ord = #{ord}
-         WHERE seat_group_id = #{seatGroupId}
+         WHERE event_id = #{eventId}
+           AND seat_group_id = #{seatGroupId}
     </update>
 
     <!-- M4 OFF→ON 1단계 — 재채번 순서 결정용 안정 정렬 조회(guest name 오름차순, 동명이인은 id로 tiebreak). -->
@@ -156,10 +161,12 @@
         ORDER BY g.name ASC, sa.id ASC
     </select>
 
+    <!-- event_id는 직접 컬럼 — cross-event 격리 방어심층(deleteEmptySeats·updateOrdForGroup과 동일 패턴). -->
     <update id="updateOrd">
         UPDATE seat_assignment
            SET ord = #{ord}
          WHERE id = #{id}
+           AND event_id = #{eventId}
     </update>
 
 </mapper>

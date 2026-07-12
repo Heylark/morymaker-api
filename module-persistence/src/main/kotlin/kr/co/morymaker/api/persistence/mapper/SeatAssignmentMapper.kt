@@ -43,17 +43,17 @@ interface SeatAssignmentMapper {
     /** 신규 배정 세트 일괄 삽입(§12-5 M1 원자 교체 2단계). */
     fun insertBatch(@Param("list") rows: List<SeatAssignment>)
 
-    /** M4 ON→OFF 1단계 — 빈 좌석(guest_id IS NULL) 행 삭제. */
-    fun deleteEmptySeats(@Param("seatGroupId") seatGroupId: String)
+    /** M4 ON→OFF 1단계 — 빈 좌석(guest_id IS NULL) 행 삭제. eventId는 cross-event 격리 방어심층. */
+    fun deleteEmptySeats(@Param("eventId") eventId: String, @Param("seatGroupId") seatGroupId: String)
 
-    /** M4 ON→OFF 2단계 — 남은 멤버 ord 일괄 갱신. */
-    fun updateOrdForGroup(@Param("seatGroupId") seatGroupId: String, @Param("ord") ord: Int)
+    /** M4 ON→OFF 2단계 — 남은 멤버 ord 일괄 갱신. eventId는 cross-event 격리 방어심층. */
+    fun updateOrdForGroup(@Param("eventId") eventId: String, @Param("seatGroupId") seatGroupId: String, @Param("ord") ord: Int)
 
     /** M4 OFF→ON 1단계 — 멤버 안정 정렬(guest name 오름차순, tiebreak id) 조회. */
     fun findMembersOrderedByGuestName(@Param("seatGroupId") seatGroupId: String): List<SeatAssignment>
 
-    /** M4 OFF→ON 2단계 — 단건 ord 갱신. */
-    fun updateOrd(@Param("id") id: String, @Param("ord") ord: Int)
+    /** M4 OFF→ON 2단계 — 단건 ord 갱신. eventId는 cross-event 격리 방어심층. */
+    fun updateOrd(@Param("eventId") eventId: String, @Param("id") id: String, @Param("ord") ord: Int)
 }
 
 /** [SeatAssignmentMapper.findGroupIdsByGuestIds] 조회 행 — Adapter가 Map으로 번역한다(ACL, mybatis-advanced.md §4). */

@@ -35,7 +35,7 @@ internal class ParkingZonePersistenceAdapter(
 
     override fun findByEventId(eventId: String): List<ParkingSlotTitle> = slotTitleMapper.findByEventId(eventId)
 
-    override fun deleteByZoneId(zoneId: String) = slotTitleMapper.deleteByZoneId(zoneId)
+    override fun deleteByZoneId(eventId: String, zoneId: String) = slotTitleMapper.deleteByZoneId(eventId, zoneId)
 
     override fun insertBatch(titles: List<ParkingSlotTitle>) {
         // foreach 배치 INSERT는 빈 리스트면 문법 오류(VALUES 절 없음) — 호출 전 가드.

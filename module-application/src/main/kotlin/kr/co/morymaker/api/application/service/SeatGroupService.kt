@@ -62,7 +62,7 @@ internal class SeatGroupService(
 
         // M4 — numbering 값이 실제로 바뀔 때만 재해석(라벨만 수정은 no-op).
         if (existing.numbering != command.numbering) {
-            if (command.numbering) reorderOffToOn(gid) else reorderOnToOff(gid)
+            if (command.numbering) reorderOffToOn(eventId, gid) else reorderOnToOff(eventId, gid)
         }
 
         val counts = assignmentPort.countsByGroup(eventId).firstOrNull { it.seatGroupId == gid }
@@ -80,16 +80,16 @@ internal class SeatGroupService(
     }
 
     // ON→OFF: 빈 좌석(guest_id IS NULL) 삭제 + 남은 멤버 ord=ORD_UNNUMBERED 일괄 갱신.
-    private fun reorderOnToOff(seatGroupId: String) {
-        assignmentPort.deleteEmptySeats(seatGroupId)
-        assignmentPort.updateOrdForGroup(seatGroupId, SeatAssignment.ORD_UNNUMBERED)
+    private fun reorderOnToOff(eventId: String, seatGroupId: String) {
+        assignmentPort.deleteEmptySeats(eventId, seatGroupId)
+        assignmentPort.updateOrdForGroup(eventId, seatGroupId, SeatAssignment.ORD_UNNUMBERED)
     }
 
     // OFF→ON: 멤버를 이름 오름차순(동명이인은 id로 안정 정렬)으로 1..N 재채번. 빈 좌석 자동 삽입 없음
     // (관리자가 §12-5 [+ 빈 좌석]으로 추가).
-    private fun reorderOffToOn(seatGroupId: String) {
+    private fun reorderOffToOn(eventId: String, seatGroupId: String) {
         val members = assignmentPort.findMembersOrderedByGuestName(seatGroupId)
-        members.forEachIndexed { index, member -> assignmentPort.updateOrd(member.id, index + 1) }
+        members.forEachIndexed { index, member -> assignmentPort.updateOrd(eventId, member.id, index + 1) }
     }
 
     private fun SeatGroup.toView(counts: SeatGroupCounts?): SeatGroupView = SeatGroupView(
