@@ -42,12 +42,13 @@ internal class SeatAssignmentPersistenceAdapter(
         if (rows.isNotEmpty()) assignmentMapper.insertBatch(rows)
     }
 
-    override fun deleteEmptySeats(seatGroupId: String) = assignmentMapper.deleteEmptySeats(seatGroupId)
+    override fun deleteEmptySeats(eventId: String, seatGroupId: String) = assignmentMapper.deleteEmptySeats(eventId, seatGroupId)
 
-    override fun updateOrdForGroup(seatGroupId: String, ord: Int) = assignmentMapper.updateOrdForGroup(seatGroupId, ord)
+    override fun updateOrdForGroup(eventId: String, seatGroupId: String, ord: Int) =
+        assignmentMapper.updateOrdForGroup(eventId, seatGroupId, ord)
 
     override fun findMembersOrderedByGuestName(seatGroupId: String): List<SeatAssignment> =
         assignmentMapper.findMembersOrderedByGuestName(seatGroupId)
 
-    override fun updateOrd(id: String, ord: Int) = assignmentMapper.updateOrd(id, ord)
+    override fun updateOrd(eventId: String, id: String, ord: Int) = assignmentMapper.updateOrd(eventId, id, ord)
 }

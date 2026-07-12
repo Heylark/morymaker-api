@@ -119,7 +119,7 @@ class SeatGroupServiceTest {
 
         service.updateGroup("ev1", "g1", SeatGroupUpdateCommand(label = "A열 변경", numbering = true))
 
-        verify(exactly = 0) { assignmentPort.deleteEmptySeats(any()) }
+        verify(exactly = 0) { assignmentPort.deleteEmptySeats(any(), any()) }
         verify(exactly = 0) { assignmentPort.findMembersOrderedByGuestName(any()) }
     }
 
@@ -128,14 +128,14 @@ class SeatGroupServiceTest {
         every { eventScopeGuard.assertAccess("ev1") } returns Unit
         every { groupPort.fetchById("ev1", "g1") } returns sampleGroup(numbering = true)
         every { groupPort.update(any()) } returns Unit
-        every { assignmentPort.deleteEmptySeats("g1") } returns Unit
-        every { assignmentPort.updateOrdForGroup("g1", SeatAssignment.ORD_UNNUMBERED) } returns Unit
+        every { assignmentPort.deleteEmptySeats("ev1", "g1") } returns Unit
+        every { assignmentPort.updateOrdForGroup("ev1", "g1", SeatAssignment.ORD_UNNUMBERED) } returns Unit
         every { assignmentPort.countsByGroup("ev1") } returns emptyList()
 
         service.updateGroup("ev1", "g1", SeatGroupUpdateCommand(label = "A열", numbering = false))
 
-        verify(exactly = 1) { assignmentPort.deleteEmptySeats("g1") }
-        verify(exactly = 1) { assignmentPort.updateOrdForGroup("g1", SeatAssignment.ORD_UNNUMBERED) }
+        verify(exactly = 1) { assignmentPort.deleteEmptySeats("ev1", "g1") }
+        verify(exactly = 1) { assignmentPort.updateOrdForGroup("ev1", "g1", SeatAssignment.ORD_UNNUMBERED) }
         verify(exactly = 0) { assignmentPort.findMembersOrderedByGuestName(any()) }
     }
 
@@ -149,15 +149,15 @@ class SeatGroupServiceTest {
             sampleAssignment("a2", "guestB"),
             sampleAssignment("a3", "guestC"),
         )
-        every { assignmentPort.updateOrd(any(), any()) } returns Unit
+        every { assignmentPort.updateOrd(any(), any(), any()) } returns Unit
         every { assignmentPort.countsByGroup("ev1") } returns emptyList()
 
         service.updateGroup("ev1", "g1", SeatGroupUpdateCommand(label = "A열", numbering = true))
 
-        verify(exactly = 1) { assignmentPort.updateOrd("a1", 1) }
-        verify(exactly = 1) { assignmentPort.updateOrd("a2", 2) }
-        verify(exactly = 1) { assignmentPort.updateOrd("a3", 3) }
-        verify(exactly = 0) { assignmentPort.deleteEmptySeats(any()) }
+        verify(exactly = 1) { assignmentPort.updateOrd("ev1", "a1", 1) }
+        verify(exactly = 1) { assignmentPort.updateOrd("ev1", "a2", 2) }
+        verify(exactly = 1) { assignmentPort.updateOrd("ev1", "a3", 3) }
+        verify(exactly = 0) { assignmentPort.deleteEmptySeats(any(), any()) }
     }
 
     // ── deleteGroup ────────────────────────────────────────────────

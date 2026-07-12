@@ -74,7 +74,7 @@ internal class ParkingZoneService(
         // titleOverrides가 null이면(폼이 함께 전달하지 않은 경우) 타이틀은 건드리지 않는다.
         // null이 아니면(빈 맵 포함) zone_id 기준 전삭제 후 재삽입 — §6-3 delete-insert.
         val overrides = if (command.titleOverrides != null) {
-            slotTitlePort.deleteByZoneId(zid)
+            slotTitlePort.deleteByZoneId(eventId, zid)
             val rows = command.titleOverrides.mapNotNull { (slotNoText, title) ->
                 val slotNo = slotNoText.toIntOrNull() ?: return@mapNotNull null
                 if (title.isBlank()) null else ParkingSlotTitle(zid, slotNo, title)

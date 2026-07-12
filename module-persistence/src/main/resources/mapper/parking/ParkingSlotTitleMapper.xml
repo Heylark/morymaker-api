@@ -46,9 +46,19 @@
         WHERE pz.event_id = #{eventId}
     </select>
 
+    <!--
+        zone_id 기준 전삭제(§6-3 delete-insert 1단계). parking_slot_title에는 event_id 컬럼이 없어
+        parking_zone을 경유한 EXISTS 상관 서브쿼리로 event 스코프를 봉인한다(zone.id가 PK라 단건
+        존재검사, 02-architect ADR-3) — cross-event 격리 방어심층. 정상(zone∈event)이면 EXISTS
+        true로 기존과 동일 삭제, 위조된 타 행사 zoneId는 EXISTS false로 0행 매칭되어 차단된다.
+    -->
     <delete id="deleteByZoneId">
         DELETE FROM parking_slot_title
          WHERE zone_id = #{zoneId}
+           AND EXISTS (
+               SELECT 1 FROM parking_zone pz
+                WHERE pz.id = #{zoneId} AND pz.event_id = #{eventId}
+           )
     </delete>
 
     <insert id="insertBatch">
