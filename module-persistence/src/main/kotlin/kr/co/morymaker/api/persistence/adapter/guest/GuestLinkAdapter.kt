@@ -23,8 +23,8 @@ internal class GuestLinkAdapter(
         return matched?.let { GuestLink(guestId = it.id, guestName = it.name, guestStatus = it.status) }
     }
 
-    override fun markVisitedAndBackfillPlate(guestId: String, plate: String) {
-        guestMapper.markVisitedIfWaiting(guestId)
-        guestMapper.backfillPlateIfEmpty(guestId, plate)
+    override fun markVisitedAndBackfillPlate(eventId: String, guestId: String, plate: String) {
+        guestMapper.markVisitedIfWaiting(eventId, guestId)
+        guestMapper.backfillPlateIfEmpty(eventId, guestId, plate)
     }
 }

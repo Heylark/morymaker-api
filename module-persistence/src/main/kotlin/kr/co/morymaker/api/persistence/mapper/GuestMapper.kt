@@ -50,8 +50,8 @@ interface GuestMapper {
     /** phone 완전일치 활성 참석자 조회(plate 매칭 실패 시 보조) — 취소자 제외. 없으면 null. */
     fun selectActiveByPhone(@Param("eventId") eventId: String, @Param("phone") phone: String): Guest?
 
-    /** 대기→방문 가드 전이(매핑 성공 시). 대기 상태가 아니면 영향 0행(가드). */
-    fun markVisitedIfWaiting(@Param("gid") gid: String)
+    /** 대기→방문 가드 전이(매핑 성공 시). 대기 상태가 아니면 영향 0행(가드). event_id는 cross-event 격리 방어심층. */
+    fun markVisitedIfWaiting(@Param("eventId") eventId: String, @Param("gid") gid: String)
 
     /** 조건부 체크인 전이(guestId 대상) — `status != '참석'`일 때만 참석 확정. 이미 참석이면 영향 0행(가드). */
     fun markAttendedIfNotAttended(
@@ -67,14 +67,14 @@ interface GuestMapper {
         @Param("visitAt") visitAt: Instant,
     ): Int
 
-    /** plate 백필 — 기존 값이 비어 있을 때만 갱신(가드). */
-    fun backfillPlateIfEmpty(@Param("gid") gid: String, @Param("plate") plate: String)
+    /** plate 백필 — 기존 값이 비어 있을 때만 갱신(가드). event_id는 cross-event 격리 방어심층. */
+    fun backfillPlateIfEmpty(@Param("eventId") eventId: String, @Param("gid") gid: String, @Param("plate") plate: String)
 
     // ➕ §12 신규 — seat→guest 매핑(M1 payload 검증·M3 동기화). GuestSeatLinkAdapter가 위임(테이블 소유권 유지).
 
     /** event 소속 guestId만 필터링(§12-5 M1 payload 검증). */
     fun selectExistingIds(@Param("eventId") eventId: String, @Param("guestIds") guestIds: List<String>): List<String>
 
-    /** guest.seat_group_id 일괄 갱신(§12-5 M3 동기화). seatGroupId=null이면 해제. */
-    fun updateSeatGroupId(@Param("guestIds") guestIds: List<String>, @Param("seatGroupId") seatGroupId: String?)
+    /** guest.seat_group_id 일괄 갱신(§12-5 M3 동기화). seatGroupId=null이면 해제. event_id는 cross-event 격리 방어심층. */
+    fun updateSeatGroupId(@Param("eventId") eventId: String, @Param("guestIds") guestIds: List<String>, @Param("seatGroupId") seatGroupId: String?)
 }

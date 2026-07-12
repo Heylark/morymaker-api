@@ -58,7 +58,7 @@ internal class ParkingRecordService(
         val existing = recordPort.fetchById(eventId, id) ?: throw NoSuchElementException("주차 기록을 찾을 수 없습니다")
         // 이미 출차 상태면 재변경 없이 멱등 재조회(§6-7).
         if (existing.status == ParkingRecord.STATUS_CHECKED_OUT) return existing
-        recordPort.checkout(id)
+        recordPort.checkout(eventId, id)
         return existing.with(status = ParkingRecord.STATUS_CHECKED_OUT)
     }
 
@@ -66,7 +66,7 @@ internal class ParkingRecordService(
     override fun clearReview(eventId: String, id: String): ParkingRecord {
         eventScopeGuard.assertAccess(eventId)
         val existing = recordPort.fetchById(eventId, id) ?: throw NoSuchElementException("주차 기록을 찾을 수 없습니다")
-        recordPort.clearReview(id)
+        recordPort.clearReview(eventId, id)
         return existing.with(reviewNeeded = false)
     }
 }

@@ -75,12 +75,12 @@ class ParkingRecordServiceTest {
     fun `checkout은 주차중 기록을 출차 상태로 전환한다`() {
         every { eventScopeGuard.assertAccess("ev1") } returns Unit
         every { recordPort.fetchById("ev1", "r1") } returns sampleRecord(id = "r1")
-        every { recordPort.checkout("r1") } returns Unit
+        every { recordPort.checkout("ev1", "r1") } returns Unit
 
         val result = service.checkout("ev1", "r1")
 
         assertEquals(ParkingRecord.STATUS_CHECKED_OUT, result.status)
-        verify(exactly = 1) { recordPort.checkout("r1") }
+        verify(exactly = 1) { recordPort.checkout("ev1", "r1") }
     }
 
     @Test
@@ -91,7 +91,7 @@ class ParkingRecordServiceTest {
         val result = service.checkout("ev1", "r1")
 
         assertEquals(ParkingRecord.STATUS_CHECKED_OUT, result.status)
-        verify(exactly = 0) { recordPort.checkout(any()) }
+        verify(exactly = 0) { recordPort.checkout(any(), any()) }
     }
 
     @Test
@@ -108,13 +108,13 @@ class ParkingRecordServiceTest {
     fun `clearReview는 상태 변경 없이 review_needed만 해제한다`() {
         every { eventScopeGuard.assertAccess("ev1") } returns Unit
         every { recordPort.fetchById("ev1", "r1") } returns sampleRecord(id = "r1", reviewNeeded = true)
-        every { recordPort.clearReview("r1") } returns Unit
+        every { recordPort.clearReview("ev1", "r1") } returns Unit
 
         val result = service.clearReview("ev1", "r1")
 
         assertFalse(result.reviewNeeded)
         assertEquals(ParkingRecord.STATUS_PARKED, result.status)
-        verify(exactly = 1) { recordPort.clearReview("r1") }
+        verify(exactly = 1) { recordPort.clearReview("ev1", "r1") }
     }
 
     // ── listRecords ────────────────────────────────────────────────

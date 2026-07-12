@@ -10,6 +10,6 @@ interface GuestSeatLinkPort {
     /** payload guestId 유효성 검증(§12-5 M1) — 해당 event 소속 guestId만 필터링해 반환. */
     fun filterExistingIds(eventId: String, guestIds: List<String>): Set<String>
 
-    /** M3 동기화 — `guest.seat_group_id` 일괄 갱신(seatGroupId=null이면 해제). 빈 리스트는 무동작. */
-    fun updateSeatGroupId(guestIds: List<String>, seatGroupId: String?)
+    /** M3 동기화 — `guest.seat_group_id` 일괄 갱신(seatGroupId=null이면 해제). 빈 리스트는 무동작. eventId는 cross-event 격리 방어심층 스코핑용. */
+    fun updateSeatGroupId(eventId: String, guestIds: List<String>, seatGroupId: String?)
 }

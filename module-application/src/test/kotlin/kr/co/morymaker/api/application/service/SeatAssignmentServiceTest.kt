@@ -156,8 +156,8 @@ class SeatAssignmentServiceTest {
         every { assignmentPort.deleteByGroup("ev1", "g1") } answers { deleted.add("g1") }
         val insertedRows = slot<List<SeatAssignment>>()
         every { assignmentPort.insertBatch(capture(insertedRows)) } returns Unit
-        every { guestSeatLinkPort.updateSeatGroupId(listOf("u1"), null) } returns Unit
-        every { guestSeatLinkPort.updateSeatGroupId(listOf("u2"), "g1") } returns Unit
+        every { guestSeatLinkPort.updateSeatGroupId("ev1", listOf("u1"), null) } returns Unit
+        every { guestSeatLinkPort.updateSeatGroupId("ev1", listOf("u2"), "g1") } returns Unit
         every { assignmentPort.findByGroup("ev1", "g1", null, null) } returns listOf(
             SeatSlotRow(id = "new1", ord = 1, guestId = "u2", guestName = "김민준"),
         )
@@ -170,8 +170,8 @@ class SeatAssignmentServiceTest {
         assertEquals("u2", insertedRows.captured.first().guestId)
         assertEquals(1, result.size)
         assertEquals("김민준", result.first().guestName)
-        verify(exactly = 1) { guestSeatLinkPort.updateSeatGroupId(listOf("u1"), null) }
-        verify(exactly = 1) { guestSeatLinkPort.updateSeatGroupId(listOf("u2"), "g1") }
+        verify(exactly = 1) { guestSeatLinkPort.updateSeatGroupId("ev1", listOf("u1"), null) }
+        verify(exactly = 1) { guestSeatLinkPort.updateSeatGroupId("ev1", listOf("u2"), "g1") }
     }
 
     @Test
@@ -183,7 +183,7 @@ class SeatAssignmentServiceTest {
         every { assignmentPort.deleteByGroup("ev1", "g2") } returns Unit
         val insertedRows = slot<List<SeatAssignment>>()
         every { assignmentPort.insertBatch(capture(insertedRows)) } returns Unit
-        every { guestSeatLinkPort.updateSeatGroupId(any(), any()) } returns Unit
+        every { guestSeatLinkPort.updateSeatGroupId(any(), any(), any()) } returns Unit
         every { assignmentPort.findByGroup("ev1", "g2", null, null) } returns emptyList()
 
         val command = BulkAssignCommand(groupNo = 1, assignments = listOf(AssignmentEntry(ord = 1, guestId = "u1")))
@@ -199,14 +199,14 @@ class SeatAssignmentServiceTest {
         every { assignmentPort.findGuestIdsByGroup("g1") } returns listOf("u1", "u2")
         every { assignmentPort.deleteByGroup("ev1", "g1") } returns Unit
         every { assignmentPort.insertBatch(emptyList()) } returns Unit
-        every { guestSeatLinkPort.updateSeatGroupId(listOf("u1", "u2"), null) } returns Unit
+        every { guestSeatLinkPort.updateSeatGroupId("ev1", listOf("u1", "u2"), null) } returns Unit
         every { assignmentPort.findByGroup("ev1", "g1", null, null) } returns emptyList()
 
         val result = service.replaceAssignments("ev1", BulkAssignCommand(groupNo = 9, assignments = emptyList()))
 
         assertTrue(result.isEmpty())
-        verify(exactly = 1) { guestSeatLinkPort.updateSeatGroupId(listOf("u1", "u2"), null) }
-        verify(exactly = 0) { guestSeatLinkPort.updateSeatGroupId(any(), "g1") }
+        verify(exactly = 1) { guestSeatLinkPort.updateSeatGroupId("ev1", listOf("u1", "u2"), null) }
+        verify(exactly = 0) { guestSeatLinkPort.updateSeatGroupId(any(), any(), "g1") }
     }
 
     // ── replaceAssignments — 동시성 예외 번역 ──────────────────────

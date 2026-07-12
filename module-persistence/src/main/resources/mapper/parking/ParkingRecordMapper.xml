@@ -4,9 +4,10 @@
 <!--
     ParkingRecordMapper.xml — parking_record 테이블(1테이블1파일).
 
-    guest 방향 최소 3쿼리(교차 최소 범위)는 파일 상단에 그대로 유지한다(❄️ 동결 — 변경 금지).
-    §6 주차 도메인 CRUD(zone·record 수직 신설)가 columns/BaseResultMap을 처음 도입하며 이어
-    붙는다.
+    guest 방향 최소 3쿼리(교차 최소 범위)는 파일 상단에 그대로 유지한다(❄️ 동결 — 변경 금지, 단
+    linkGuest는 cross-event 격리 방어심층 봉인을 위해 이 동결 결정을 재검토·해제했다 — 아래
+    linkGuest 주석 참조). §6 주차 도메인 CRUD(zone·record 수직 신설)가 columns/BaseResultMap을
+    처음 도입하며 이어 붙는다.
 
     <constructor> 선언 순서는 ParkingRecord 주 생성자 파라미터 순서와 정확히 일치해야 한다:
     (id, eventId, zoneId, slotSig, plate, phone, vipName, guestId, registeredBy, registeredAt,
@@ -24,7 +25,7 @@
 -->
 <mapper namespace="kr.co.morymaker.api.persistence.mapper.ParkingRecordMapper">
 
-    <!-- ❄️ 동결 영역 — 기존 3 scalar 쿼리(guest 교차 최소 범위, 변경 금지). -->
+    <!-- ❄️ 동결 영역 — 기존 3 scalar 쿼리(guest 교차 최소 범위, 변경 금지 — 단 linkGuest는 아래 참조). -->
 
     <!-- idx_precord_plate(event_id, plate) 커버. status='주차중'인 활성 기록만 매칭 대상. -->
     <select id="selectActiveRecordIdByPlate" resultType="string">
@@ -46,10 +47,17 @@
         LIMIT 1
     </select>
 
+    <!--
+        linkGuest는 event_id 봉인으로 eventId 파라미터를 추가한다 — 서비스 가드 없이 재사용해도
+        SQL이 타 행사 행을 0행 매칭으로 차단하는 cross-event 격리 방어심층. 나머지 2개 scalar
+        읽기(plate→record id / guestId→slot, 위 두 SELECT)는 이미 event_id를 보유하므로
+        시그니처·SQL 불변을 유지한다.
+    -->
     <update id="linkGuest">
         UPDATE parking_record
            SET guest_id = #{guestId}
          WHERE id = #{recordId}
+           AND event_id = #{eventId}
     </update>
 
     <!-- ➕ §6 신규 영역 — parking_record 전체 CRUD. -->
@@ -170,7 +178,12 @@
         )
     </insert>
 
-    <!-- 자리 이동(§4-1 케이스 C·D) — slot_sig·zone_id·review_needed·guest_id만 갱신. -->
+    <!--
+        자리 이동(§4-1 케이스 C·D) — slot_sig·zone_id·review_needed·guest_id만 갱신. event_id
+        조건의 #{eventId}는 별도 파라미터가 아니라 ParkingRecord.eventId 프로퍼티로 바인딩된다
+        (parameterType=ParkingRecord) — 호출부가 event 스코프 조회로 얻은 레코드를 그대로
+        갱신하므로 record.eventId 자체가 이미 가드된 값이다(02-architect §4).
+    -->
     <update id="updateSlotMove" parameterType="kr.co.morymaker.api.domain.parking.ParkingRecord">
         UPDATE parking_record
            SET  slot_sig      = #{slotSig}
@@ -178,25 +191,31 @@
               , review_needed = #{reviewNeeded}
               , guest_id      = #{guestId}
          WHERE id = #{id}
+           AND event_id = #{eventId}
     </update>
 
-    <!-- 본인 재등록(§4-1 케이스 A) — 위치 재표시, registered_at만 현재 시각으로 갱신. -->
+    <!-- 본인 재등록(§4-1 케이스 A) — 위치 재표시, registered_at만 현재 시각으로 갱신. event_id는 cross-event 격리 방어심층. -->
     <update id="touchRegisteredAt">
         UPDATE parking_record
            SET registered_at = NOW()
          WHERE id = #{id}
+           AND event_id = #{eventId}
     </update>
 
+    <!-- event_id는 cross-event 격리 방어심층 — 서비스가 이미 event 스코프 id만 넘기므로 정상 동작 불변. -->
     <update id="checkout">
         UPDATE parking_record
            SET status = '출차'
          WHERE id = #{id}
+           AND event_id = #{eventId}
     </update>
 
+    <!-- event_id는 cross-event 격리 방어심층 — 서비스가 이미 event 스코프 id만 넘기므로 정상 동작 불변. -->
     <update id="clearReview">
         UPDATE parking_record
            SET review_needed = 0
          WHERE id = #{id}
+           AND event_id = #{eventId}
     </update>
 
 </mapper>

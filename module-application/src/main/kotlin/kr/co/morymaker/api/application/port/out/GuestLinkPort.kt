@@ -12,8 +12,8 @@ interface GuestLinkPort {
     /** 주차 매핑(3-7) — plate 완전일치 우선, 없으면 phone 보조로 참석자 조회. 취소자 제외. 없으면 null. */
     fun findGuestByPlateOrPhone(eventId: String, plate: String, phone: String?): GuestLink?
 
-    /** 매핑 성공 시 참석자 방문 전이(대기→방문만, 가드) + plate 백필(비어 있을 때만). */
-    fun markVisitedAndBackfillPlate(guestId: String, plate: String)
+    /** 매핑 성공 시 참석자 방문 전이(대기→방문만, 가드) + plate 백필(비어 있을 때만). eventId는 cross-event 격리 방어심층 스코핑용. */
+    fun markVisitedAndBackfillPlate(eventId: String, guestId: String, plate: String)
 }
 
 /** [GuestLinkPort] 조회 결과 최소 축약(id·name·status). */
