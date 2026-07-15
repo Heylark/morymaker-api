@@ -6,11 +6,18 @@ import jakarta.validation.ConstraintViolationException
 import kr.co.morymaker.api.application.parking.SlotOccupiedException
 import org.junit.jupiter.api.Test
 import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
 import org.springframework.security.access.AccessDeniedException
 import org.springframework.http.HttpMethod
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import org.springframework.validation.BindingResult
 import org.springframework.validation.FieldError
 import org.springframework.web.bind.MethodArgumentNotValidException
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.servlet.NoHandlerFoundException
 import org.springframework.web.servlet.resource.NoResourceFoundException
 import kotlin.test.assertEquals
@@ -89,6 +96,51 @@ class GlobalExceptionHandlerTest {
 
         assertEquals(HttpStatus.CONFLICT, response.statusCode)
         assertEquals("SLOT_OCCUPIED", response.body?.error?.code)
+    }
+
+    @Test
+    fun `handleIllegalArgument는 400과 VALIDATION_FAILED를 반환한다`() {
+        val response = handler.handleIllegalArgument(IllegalArgumentException("검색어(q)는 필수입니다"))
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.statusCode)
+        assertEquals("VALIDATION_FAILED", response.body?.error?.code)
+        assertEquals("검색어(q)는 필수입니다", response.body?.error?.message)
+    }
+
+    @Test
+    fun `메시지 없는 IllegalArgumentException은 기본 문구로 400을 반환한다`() {
+        val response = handler.handleIllegalArgument(IllegalArgumentException())
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.statusCode)
+        assertEquals("입력값을 확인해 주세요", response.body?.error?.message)
+    }
+
+    @Test
+    fun `IllegalStateException은 요청 검증 핸들러가 아니라 catch-all로 흘러 500이 된다`() {
+        // 기존 단위 방식(핸들러 메서드 직접 호출)은 어느 핸들러가 선택되는지(라우팅) 자체를
+        // 증명하지 못한다 — 경량 standalone MockMvc로 실제 예외 타입 기반 디스패치를 검증한다.
+        // Spring 컨텍스트·DB 불요.
+        val mockMvc = MockMvcBuilders.standaloneSetup(RoutingProbeController())
+            .setControllerAdvice(GlobalExceptionHandler())
+            .build()
+
+        mockMvc.perform(get("/probe/iae"))
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+
+        mockMvc.perform(get("/probe/ise"))
+            .andExpect(status().isInternalServerError)
+            .andExpect(jsonPath("$.error.code").value("INTERNAL_ERROR"))
+    }
+
+    /** [handleIllegalArgument]/catch-all 라우팅 선택만 증명하는 최소 스텁 — 두 예외 타입을 각각 던진다. */
+    @RestController
+    private class RoutingProbeController {
+        @GetMapping("/probe/iae")
+        fun throwIae(): ResponseEntity<Unit> = throw IllegalArgumentException("검증 실패")
+
+        @GetMapping("/probe/ise")
+        fun throwIse(): ResponseEntity<Unit> = throw IllegalStateException("상태 오류")
     }
 
     @Test
