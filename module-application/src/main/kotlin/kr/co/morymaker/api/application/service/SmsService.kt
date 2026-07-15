@@ -68,7 +68,8 @@ internal class SmsService(
         )
         // upsert에 넘긴 updatedAt은 신규행 INSERT 분기에서만 의미가 있고, 기존행 UPDATE 분기는
         // DB CURRENT_TIMESTAMP가 관장한다(SmsTemplateMapper.xml) — 재조회로 실제 저장값을 반환한다.
-        val saved = requireNotNull(smsTemplatePort.fetchByEvent(eventId)) { "템플릿 저장에 실패했습니다" }
+        // 방금 저장한 행이 없다면 클라이언트 입력 문제가 아니라 서버 장애이므로 상태 검증으로 드러낸다.
+        val saved = checkNotNull(smsTemplatePort.fetchByEvent(eventId)) { "템플릿 저장에 실패했습니다" }
         return SmsTemplateView(
             eventId = eventId, body = saved.body, variables = SmsRenderer.VARIABLES,
             updatedAt = toKstIso(saved.updatedAt),

@@ -87,6 +87,19 @@ class SmsServiceTest {
         verify(exactly = 1) { smsTemplatePort.upsert(any()) }
     }
 
+    @Test
+    fun `템플릿 저장 후 재조회가 비면 서버 오류로 드러낸다`() {
+        every { eventScopeGuard.assertAccess("ev1") } returns Unit
+        every { smsTemplatePort.upsert(any()) } returns Unit
+        every { smsTemplatePort.fetchByEvent("ev1") } returns null
+
+        // 방금 저장한 행의 재조회 실패는 클라이언트 입력 문제가 아니라 서버 장애이므로
+        // IllegalArgumentException이 아닌 IllegalStateException으로 드러나야 한다(전환 증명).
+        assertFailsWith<IllegalStateException> {
+            service.upsertTemplate("ev1", "본문")
+        }
+    }
+
     // ── gate ───────────────────────────────────────────────────────
 
     @Test
