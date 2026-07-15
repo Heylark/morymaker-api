@@ -16,12 +16,12 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
 /**
- * 개인 허브 공개 API(§10-1·§10-2) — 무인증. `SecurityConfig`의 `/api/public` 하위 전체 permitAll이
+ * 개인 허브 공개 API(§10-1·§10-2) — 무인증. `SecurityConfig`의 `/public` 하위 전체 permitAll이
  * 이미 인증을 면제하며, 이 컨트롤러는 `@PreAuthorize`를 두지 않는다(역할 게이트 대상 자체가
  * 아니다). 인가는 [PublicHubUseCase] 구현체의 token capability 유효성 검증으로 대체된다.
  */
 @RestController
-@RequestMapping("/api/public/u/{token}")
+@RequestMapping("/public/u/{token}")
 class PublicHubController(
     private val publicHubUseCase: PublicHubUseCase,
     private val publicProperties: PublicProperties,

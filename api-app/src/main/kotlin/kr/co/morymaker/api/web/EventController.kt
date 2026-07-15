@@ -35,7 +35,7 @@ import org.springframework.web.bind.annotation.RestController
  * `EventUpdateRequest`엔 컬러 필드 자체가 없어 브랜딩이 이 경로로 새는 것이 구조적으로 불가능하다.
  */
 @RestController
-@RequestMapping("/api/events")
+@RequestMapping("/events")
 class EventController(
     private val eventUseCase: EventUseCase,
 ) {

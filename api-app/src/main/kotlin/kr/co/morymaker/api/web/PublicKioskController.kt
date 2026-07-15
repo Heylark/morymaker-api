@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController
 
 /**
  * kiosk 공개 조회 API(KIO-02·04·05) — 무인증 공개 서브라우트. `SecurityConfig`의
- * `/api/public` 하위 전체 permitAll이 자동 커버하고, `EventScopeInterceptor`는 `/api/events`
+ * `/public` 하위 전체 permitAll이 자동 커버하고, `EventScopeInterceptor`는 `/events`
  * 하위만 매칭해 이 경로를 가로채지 않는다(prefix 상이 — 의도된 공개 표면, 게이트 우회 아님).
  *
  * `{eid}` = event.id 직접 재사용(eventCode capability 확립 패턴). rate limit은
@@ -29,7 +29,7 @@ import org.springframework.web.bind.annotation.RestController
  * 체크인 POST 모두 적용한다.
  */
 @RestController
-@RequestMapping("/api/public/events/{eid}")
+@RequestMapping("/public/events/{eid}")
 class PublicKioskController(
     private val kioskUseCase: PublicKioskUseCase,
 ) {

@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController
  * 이 컨트롤러는 `@PreAuthorize`를 두지 않는다.
  */
 @RestController
-@RequestMapping("/api/public/p/{slotCode}")
+@RequestMapping("/public/p/{slotCode}")
 class PublicParkingController(
     private val publicParkingUseCase: PublicParkingUseCase,
 ) {

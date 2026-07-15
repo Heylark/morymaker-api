@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController
  * `{eid}` 경로변수명은 고정 — `EventScopeInterceptor`가 "eid" 키만 검사한다(00-research 발견 3).
  */
 @RestController
-@RequestMapping("/api/events/{eid}/lookup")
+@RequestMapping("/events/{eid}/lookup")
 class LookupController(
     private val lookupUseCase: LookupUseCase,
 ) {
