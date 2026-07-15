@@ -115,8 +115,17 @@ class GlobalExceptionHandler {
         ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
             .body(ErrorBody(ErrorDetail("RATE_LIMIT_EXCEEDED", e.message ?: "요청이 너무 많습니다")))
 
-    // @Valid 애노테이션이 표현할 수 없는 요청 형태 검증(예: 두 필드 중 최소 하나 필수 —
-    // CheckinRequest의 token/guestId)은 컨트롤러가 직접 던지는 이 예외로 처리한다.
+    // 이 핸들러는 "요청이 잘못됐다"만 받는다. @Valid로 표현할 수 없는 요청 형태 검증(예: 두 필드 중
+    // 최소 하나 필수 — CheckinRequest의 token/guestId)은 컨트롤러가 직접 이 예외를 던지고, 서비스
+    // 계층도 호출자가 넘긴 입력을 require()/requireNotNull()로 검증해 같은 경로를 탄다(일부 컨트롤러는
+    // 이 위임을 전제로 파라미터를 required=false로 선언한다).
+    //
+    // 반대로 서버가 스스로 보장해야 하는 불변식 — 방금 저장한 행의 재조회 성공, 상류 분류가 이미
+    // 걸러낸 뒤 남은 값의 존재 같은 것 — 이 깨진 상황은 클라이언트가 고칠 수 없는 서버 장애다.
+    // 이때는 require()가 아니라 check()/checkNotNull()로 표현해 IllegalStateException을 던진다.
+    // 그러면 이 핸들러를 지나쳐 맨 아래 catch-all이 받아 500과 스택트레이스 로그로 남는다.
+    // 불변식 위반에 require()를 쓰면 여기 걸려 400이 나가고, 클라이언트는 자신이 고칠 수 없는 오류를
+    // 입력 탓으로 안내받으며 서버 장애가 4xx로 집계돼 알림에서 은폐된다.
     @ExceptionHandler(IllegalArgumentException::class)
     fun handleIllegalArgument(e: IllegalArgumentException): ResponseEntity<ErrorBody> =
         ResponseEntity.status(HttpStatus.BAD_REQUEST)

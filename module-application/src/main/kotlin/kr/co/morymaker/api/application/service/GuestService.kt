@@ -132,7 +132,9 @@ internal class GuestService(
             val guest = Guest(
                 id = UUID.randomUUID().toString(),
                 eventId = eventId,
-                name = requireNotNull(row.name).trim(),
+                // 이름이 비었거나 없는 행은 상류 분류가 이미 걸러내 여기 도달하지 못한다 — null이면
+                // 분류 로직이 깨진 것이므로 입력 오류(400)가 아니라 서버 오류로 드러내야 한다.
+                name = checkNotNull(row.name).trim(),
                 org = row.org,
                 title = row.title,
                 phone = row.phone,
