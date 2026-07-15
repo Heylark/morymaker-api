@@ -54,7 +54,7 @@ class ParkingZoneControllerTest(
 
     private fun createEvent(name: String = "주차 구획 테스트 행사"): String {
         val response = mockMvc.perform(
-            post("/api/events")
+            post("/events")
                 .with(authenticatedAs(roles = listOf("SYSTEM_ADMIN")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"name":"$name"}"""),
@@ -66,7 +66,7 @@ class ParkingZoneControllerTest(
 
     private fun createZoneRaw(eid: String, body: Map<String, Any?>, eventIds: List<String> = listOf(eid)) =
         mockMvc.perform(
-            post("/api/events/$eid/parking-zones")
+            post("/events/$eid/parking-zones")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = eventIds))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(body)),
@@ -107,14 +107,14 @@ class ParkingZoneControllerTest(
         val eid = createEvent()
         val zid = createZone(eid)
         mockMvc.perform(
-            put("/api/events/$eid/parking-zones/$zid")
+            put("/events/$eid/parking-zones/$zid")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"part1":"지하 2층","part2":"A구역","startNo":1,"slotCount":12,"titleOverrides":{"3":"귀빈석"}}"""),
         ).andExpect(status().isOk)
 
         mockMvc.perform(
-            get("/api/events/$eid/parking-zones")
+            get("/events/$eid/parking-zones")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         )
             .andExpect(status().isOk)
@@ -127,7 +127,7 @@ class ParkingZoneControllerTest(
         val zid = createZone(eid)
 
         mockMvc.perform(
-            put("/api/events/$eid/parking-zones/$zid")
+            put("/events/$eid/parking-zones/$zid")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"part1":"지하 2층","part2":"A구역","startNo":1,"slotCount":12,"titleOverrides":{"3":"귀빈석","5":"VIP"}}"""),
@@ -137,7 +137,7 @@ class ParkingZoneControllerTest(
 
         // titleOverrides=null인 재수정은 기존 타이틀을 건드리지 않는다.
         mockMvc.perform(
-            put("/api/events/$eid/parking-zones/$zid")
+            put("/events/$eid/parking-zones/$zid")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"part1":"지하 2층","part2":"A구역","startNo":1,"slotCount":15}"""),
@@ -154,7 +154,7 @@ class ParkingZoneControllerTest(
         val eid = createEvent()
 
         mockMvc.perform(
-            get("/api/events/$eid/parking-zones")
+            get("/events/$eid/parking-zones")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf("다른-행사-id"))),
         )
             .andExpect(status().isForbidden)
@@ -175,7 +175,7 @@ class ParkingZoneControllerTest(
         val eid = createEvent()
 
         mockMvc.perform(
-            get("/api/events/$eid/parking-zones")
+            get("/events/$eid/parking-zones")
                 .with(authenticatedAs(roles = listOf("EVENT_STAFF"), eventIds = listOf(eid))),
         )
             .andExpect(status().isForbidden)
@@ -190,7 +190,7 @@ class ParkingZoneControllerTest(
         val zid = createZone(eid, part1 = "지하 2층", part2 = "A구역", startNo = 1, slotCount = 3)
 
         mockMvc.perform(
-            get("/api/events/$eid/parking-zones/$zid/slots")
+            get("/events/$eid/parking-zones/$zid/slots")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         )
             .andExpect(status().isOk)
@@ -207,7 +207,7 @@ class ParkingZoneControllerTest(
         val zid = createZone(eid, part1 = "지하 2층", part2 = "A구역", startNo = 1, slotCount = 3)
 
         val slotsResponse = mockMvc.perform(
-            get("/api/events/$eid/parking-zones/$zid/slots")
+            get("/events/$eid/parking-zones/$zid/slots")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         )
             .andExpect(status().isOk)
@@ -215,7 +215,7 @@ class ParkingZoneControllerTest(
         val scanUrl = objectMapper.readTree(slotsResponse).get("data").get(0).get("scanUrl").asText()
 
         val zipResult = mockMvc.perform(
-            get("/api/events/$eid/parking-zones/$zid/qr-zip")
+            get("/events/$eid/parking-zones/$zid/qr-zip")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         )
             .andExpect(status().isOk)
@@ -240,7 +240,7 @@ class ParkingZoneControllerTest(
         val zid = createZone(eid)
 
         mockMvc.perform(
-            get("/api/events/$eid/parking-zones/$zid/slots")
+            get("/events/$eid/parking-zones/$zid/slots")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf("다른-행사-id"))),
         )
             .andExpect(status().isForbidden)
@@ -253,7 +253,7 @@ class ParkingZoneControllerTest(
         val zid = createZone(eid)
 
         mockMvc.perform(
-            get("/api/events/$eid/parking-zones/$zid/slots")
+            get("/events/$eid/parking-zones/$zid/slots")
                 .with(authenticatedAs(roles = listOf("EVENT_STAFF"), eventIds = listOf(eid))),
         )
             .andExpect(status().isForbidden)
@@ -268,7 +268,7 @@ class ParkingZoneControllerTest(
         val zid = createZone(eid, part1 = "지하 2층", part2 = "A구역", startNo = 1, slotCount = 3)
 
         val result = mockMvc.perform(
-            get("/api/events/$eid/parking-zones/$zid/qr-zip")
+            get("/events/$eid/parking-zones/$zid/qr-zip")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         )
             .andExpect(status().isOk)

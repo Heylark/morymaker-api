@@ -61,7 +61,7 @@ class StatsControllerTest(
 
     private fun createEvent(name: String = "통계 테스트 행사"): String {
         val response = mockMvc.perform(
-            post("/api/events")
+            post("/events")
                 .with(authenticatedAs(roles = listOf("SYSTEM_ADMIN")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"name":"$name"}"""),
@@ -74,7 +74,7 @@ class StatsControllerTest(
     private fun registerGuest(eid: String, name: String, src: String? = null): String {
         val body = objectMapper.writeValueAsString(mapOf("name" to name, "src" to src))
         val response = mockMvc.perform(
-            post("/api/events/$eid/guests")
+            post("/events/$eid/guests")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body),
@@ -86,7 +86,7 @@ class StatsControllerTest(
 
     private fun checkinGuest(eid: String, gid: String) {
         mockMvc.perform(
-            post("/api/events/$eid/checkin")
+            post("/events/$eid/checkin")
                 .with(authenticatedAs(roles = listOf("EVENT_STAFF"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"guestId":"$gid"}"""),
@@ -95,7 +95,7 @@ class StatsControllerTest(
 
     private fun cancelGuest(eid: String, gid: String) {
         mockMvc.perform(
-            delete("/api/events/$eid/guests/$gid")
+            delete("/events/$eid/guests/$gid")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         ).andExpect(status().isOk)
     }
@@ -112,7 +112,7 @@ class StatsControllerTest(
 
     private fun createZone(eid: String, part1: String, part2: String, startNo: Int = 1, slotCount: Int = 5): String {
         val response = mockMvc.perform(
-            post("/api/events/$eid/parking-zones")
+            post("/events/$eid/parking-zones")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(mapOf("part1" to part1, "part2" to part2, "startNo" to startNo, "slotCount" to slotCount))),
@@ -135,7 +135,7 @@ class StatsControllerTest(
     }
 
     private fun getStats(eid: String, eventIds: List<String> = listOf(eid), roles: List<String> = listOf("EVENT_ADMIN")) =
-        mockMvc.perform(get("/api/events/$eid/stats").with(authenticatedAs(roles = roles, eventIds = eventIds)))
+        mockMvc.perform(get("/events/$eid/stats").with(authenticatedAs(roles = roles, eventIds = eventIds)))
 
     // ── TC-STATS-001: registration/attendance 산식(P1, 축소 worked example) ──────
 
@@ -282,7 +282,7 @@ class StatsControllerTest(
         val eid = createEvent()
 
         mockMvc.perform(
-            get("/api/events/$eid/stats/export")
+            get("/events/$eid/stats/export")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf("다른-행사-id"))),
         )
             .andExpect(status().isForbidden)
@@ -327,7 +327,7 @@ class StatsControllerTest(
         checkinGuest(eid, gid)
 
         val result = mockMvc.perform(
-            get("/api/events/$eid/stats/export")
+            get("/events/$eid/stats/export")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         )
             .andExpect(status().isOk)
@@ -401,7 +401,7 @@ class StatsControllerTest(
         val eid = createEvent()
 
         mockMvc.perform(
-            get("/api/events/$eid/stats?refresh=true")
+            get("/events/$eid/stats?refresh=true")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         )
             .andExpect(status().isOk)

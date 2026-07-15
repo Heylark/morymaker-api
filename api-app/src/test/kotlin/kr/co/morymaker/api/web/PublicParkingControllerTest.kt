@@ -45,7 +45,7 @@ class PublicParkingControllerTest(
 
     private fun createEvent(name: String = "자리 QR 테스트 행사"): String {
         val response = mockMvc.perform(
-            post("/api/events")
+            post("/events")
                 .with(authenticatedAs(roles = listOf("SYSTEM_ADMIN")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"name":"$name"}"""),
@@ -58,7 +58,7 @@ class PublicParkingControllerTest(
     /** @return zoneId — part1="지하 2층", part2="A구역", startNo=1, slotCount=12 고정. */
     private fun createZone(eid: String): String {
         val response = mockMvc.perform(
-            post("/api/events/$eid/parking-zones")
+            post("/events/$eid/parking-zones")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"part1":"지하 2층","part2":"A구역","startNo":1,"slotCount":12}"""),
@@ -70,7 +70,7 @@ class PublicParkingControllerTest(
 
     private fun parkRequest(slotCode: String, plate: String, vipName: String? = null, phone: String? = null, token: String? = null) =
         mockMvc.perform(
-            post("/api/public/p/$slotCode/park")
+            post("/public/p/$slotCode/park")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     objectMapper.writeValueAsString(
@@ -87,7 +87,7 @@ class PublicParkingControllerTest(
         val zid = createZone(eid)
         val slotCode = ParkingSlot.slotCode(zid, 1)
 
-        mockMvc.perform(get("/api/public/p/$slotCode"))
+        mockMvc.perform(get("/public/p/$slotCode"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.viewType").value("SELF_PARK_FORM"))
             .andExpect(jsonPath("$.data.occupied").value(false))
@@ -102,7 +102,7 @@ class PublicParkingControllerTest(
         val slotCode = ParkingSlot.slotCode(zid, 2)
         parkRequest(slotCode, "12가3456").andExpect(status().isCreated)
 
-        val response = mockMvc.perform(get("/api/public/p/$slotCode"))
+        val response = mockMvc.perform(get("/public/p/$slotCode"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.viewType").value("OCCUPIED_NOTICE"))
             .andExpect(jsonPath("$.data.occupied").value(true))
@@ -113,7 +113,7 @@ class PublicParkingControllerTest(
 
     @Test
     fun `무효 slotCode는 404를 받는다`() {
-        mockMvc.perform(get("/api/public/p/no-such-zone-01"))
+        mockMvc.perform(get("/public/p/no-such-zone-01"))
             .andExpect(status().isNotFound)
             .andExpect(jsonPath("$.error.code").value("NOT_FOUND"))
     }
@@ -124,7 +124,7 @@ class PublicParkingControllerTest(
         val zid = createZone(eid)
         val outOfRange = ParkingSlot.slotCode(zid, 99)
 
-        mockMvc.perform(get("/api/public/p/$outOfRange"))
+        mockMvc.perform(get("/public/p/$outOfRange"))
             .andExpect(status().isNotFound)
     }
 
@@ -164,7 +164,7 @@ class PublicParkingControllerTest(
         val slotCode = ParkingSlot.slotCode(zid, 5)
 
         mockMvc.perform(
-            post("/api/public/p/$slotCode/park")
+            post("/public/p/$slotCode/park")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"vipName":"최지우"}"""),
         )

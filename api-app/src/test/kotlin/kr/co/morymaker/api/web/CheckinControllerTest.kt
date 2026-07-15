@@ -43,7 +43,7 @@ class CheckinControllerTest(
 
     private fun createEvent(name: String = "체크인 테스트 행사"): String {
         val response = mockMvc.perform(
-            post("/api/events")
+            post("/events")
                 .with(authenticatedAs(roles = listOf("SYSTEM_ADMIN")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"name":"$name"}"""),
@@ -56,7 +56,7 @@ class CheckinControllerTest(
     /** @return (guestId, token) */
     private fun registerGuest(eid: String, name: String): Pair<String, String> {
         val response = mockMvc.perform(
-            post("/api/events/$eid/guests")
+            post("/events/$eid/guests")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"name":"$name"}"""),
@@ -75,7 +75,7 @@ class CheckinControllerTest(
         val (_, token) = registerGuest(eid, "김진우")
 
         mockMvc.perform(
-            post("/api/events/$eid/checkin")
+            post("/events/$eid/checkin")
                 .with(authenticatedAs(roles = listOf("EVENT_STAFF"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"token":"$token"}"""),
@@ -91,7 +91,7 @@ class CheckinControllerTest(
         val (gid, _) = registerGuest(eid, "박서연")
 
         val first = mockMvc.perform(
-            post("/api/events/$eid/checkin")
+            post("/events/$eid/checkin")
                 .with(authenticatedAs(roles = listOf("EVENT_STAFF"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"guestId":"$gid"}"""),
@@ -102,7 +102,7 @@ class CheckinControllerTest(
         val firstVisitAt = objectMapper.readTree(first).get("data").get("guest").get("visitAt").asText()
 
         val second = mockMvc.perform(
-            post("/api/events/$eid/checkin")
+            post("/events/$eid/checkin")
                 .with(authenticatedAs(roles = listOf("EVENT_STAFF"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"guestId":"$gid"}"""),
@@ -124,7 +124,7 @@ class CheckinControllerTest(
         val (_, token) = registerGuest(eid, "이도현")
 
         mockMvc.perform(
-            post("/api/events/$eid/checkin")
+            post("/events/$eid/checkin")
                 .with(authenticatedAs(roles = listOf("EVENT_STAFF"), eventIds = listOf("다른-행사-id")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"token":"$token"}"""),
@@ -138,7 +138,7 @@ class CheckinControllerTest(
         val eid = createEvent()
 
         mockMvc.perform(
-            post("/api/events/$eid/checkin")
+            post("/events/$eid/checkin")
                 .with(authenticatedAs(roles = listOf("EVENT_STAFF"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{}"""),
@@ -153,7 +153,7 @@ class CheckinControllerTest(
         val (gid, _) = registerGuest(eid, "정하은")
 
         mockMvc.perform(
-            post("/api/events/$eid/checkin/cancel")
+            post("/events/$eid/checkin/cancel")
                 .with(authenticatedAs(roles = listOf("EVENT_STAFF"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"guestId":"$gid"}"""),
@@ -167,14 +167,14 @@ class CheckinControllerTest(
         val eid = createEvent()
         val (gid, token) = registerGuest(eid, "최유나")
         mockMvc.perform(
-            post("/api/events/$eid/checkin")
+            post("/events/$eid/checkin")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"token":"$token"}"""),
         ).andExpect(status().isOk)
 
         mockMvc.perform(
-            post("/api/events/$eid/checkin/cancel")
+            post("/events/$eid/checkin/cancel")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"guestId":"$gid"}"""),
@@ -190,7 +190,7 @@ class CheckinControllerTest(
         val eid = createEvent()
         val (gid, token) = registerGuest(eid, "박동현")
         val groupResponse = mockMvc.perform(
-            post("/api/events/$eid/seat-groups")
+            post("/events/$eid/seat-groups")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"label":"A열","numbering":true}"""),
@@ -200,7 +200,7 @@ class CheckinControllerTest(
         // 유일해야 하므로 목표 ord(3번)까지의 빈좌석(1·2번)도 함께 제출해야 한다(단일 entry로
         // ord=12만 보내면 "1..N 연속" 검증에 걸려 400 VALIDATION_FAILED).
         mockMvc.perform(
-            put("/api/events/$eid/seat-assignments")
+            put("/events/$eid/seat-assignments")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
@@ -211,7 +211,7 @@ class CheckinControllerTest(
         ).andExpect(status().isOk)
 
         mockMvc.perform(
-            post("/api/events/$eid/checkin")
+            post("/events/$eid/checkin")
                 .with(authenticatedAs(roles = listOf("EVENT_STAFF"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"token":"$token"}"""),

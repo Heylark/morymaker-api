@@ -64,7 +64,7 @@ class SmsControllerTest(
     private fun createEvent(name: String = "문자 테스트 행사", place: String? = null): String {
         val body = objectMapper.writeValueAsString(mapOf("name" to name, "place" to place))
         val response = mockMvc.perform(
-            post("/api/events")
+            post("/events")
                 .with(authenticatedAs(roles = listOf("SYSTEM_ADMIN")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body),
@@ -77,7 +77,7 @@ class SmsControllerTest(
     private fun registerGuest(eid: String, name: String, org: String? = null, phone: String? = "010-1234-5678"): String {
         val body = objectMapper.writeValueAsString(mapOf("name" to name, "org" to org, "phone" to phone))
         val response = mockMvc.perform(
-            post("/api/events/$eid/guests")
+            post("/events/$eid/guests")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body),
@@ -92,7 +92,7 @@ class SmsControllerTest(
 
     private fun cancelGuest(eid: String, gid: String, deleteSmsLog: Boolean = false) {
         mockMvc.perform(
-            delete("/api/events/$eid/guests/$gid")
+            delete("/events/$eid/guests/$gid")
                 .param("deleteSmsLog", deleteSmsLog.toString())
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         ).andExpect(status().isOk)
@@ -100,7 +100,7 @@ class SmsControllerTest(
 
     private fun upsertTemplate(eid: String, body: String, roles: List<String> = listOf("EVENT_ADMIN"), eventIds: List<String> = listOf(eid)) =
         mockMvc.perform(
-            put("/api/events/$eid/sms-template")
+            put("/events/$eid/sms-template")
                 .with(authenticatedAs(roles = roles, eventIds = eventIds))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(mapOf("body" to body))),
@@ -108,12 +108,12 @@ class SmsControllerTest(
 
     private fun getTemplate(eid: String, roles: List<String> = listOf("EVENT_ADMIN"), eventIds: List<String> = listOf(eid)) =
         mockMvc.perform(
-            get("/api/events/$eid/sms-template").with(authenticatedAs(roles = roles, eventIds = eventIds)),
+            get("/events/$eid/sms-template").with(authenticatedAs(roles = roles, eventIds = eventIds)),
         )
 
     private fun preview(eid: String, guestId: String) =
         mockMvc.perform(
-            post("/api/events/$eid/sms-template/preview")
+            post("/events/$eid/sms-template/preview")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(mapOf("guestId" to guestId))),
@@ -121,7 +121,7 @@ class SmsControllerTest(
 
     private fun gate(eid: String, excludeAlreadySent: Boolean = true, roles: List<String> = listOf("EVENT_ADMIN"), eventIds: List<String> = listOf(eid)) =
         mockMvc.perform(
-            post("/api/events/$eid/sms/send/gate")
+            post("/events/$eid/sms/send/gate")
                 .with(authenticatedAs(roles = roles, eventIds = eventIds))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(mapOf("excludeAlreadySent" to excludeAlreadySent))),
@@ -129,7 +129,7 @@ class SmsControllerTest(
 
     private fun send(eid: String, excludeAlreadySent: Boolean = true, confirm: Boolean, roles: List<String> = listOf("EVENT_ADMIN"), eventIds: List<String> = listOf(eid)) =
         mockMvc.perform(
-            post("/api/events/$eid/sms/send")
+            post("/events/$eid/sms/send")
                 .with(authenticatedAs(roles = roles, eventIds = eventIds))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(mapOf("excludeAlreadySent" to excludeAlreadySent, "confirm" to confirm))),
@@ -137,7 +137,7 @@ class SmsControllerTest(
 
     private fun resend(eid: String, guestId: String, confirm: Boolean) =
         mockMvc.perform(
-            post("/api/events/$eid/sms/resend")
+            post("/events/$eid/sms/resend")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(mapOf("guestId" to guestId, "confirm" to confirm))),
@@ -145,7 +145,7 @@ class SmsControllerTest(
 
     private fun listLog(eid: String, roles: List<String> = listOf("EVENT_ADMIN"), eventIds: List<String> = listOf(eid)) =
         mockMvc.perform(
-            get("/api/events/$eid/sms-log").with(authenticatedAs(roles = roles, eventIds = eventIds)),
+            get("/events/$eid/sms-log").with(authenticatedAs(roles = roles, eventIds = eventIds)),
         )
 
     private fun smsLogCount(eid: String): Int =
@@ -469,7 +469,7 @@ class SmsControllerTest(
         send(eid, confirm = true).andExpect(status().isOk)
 
         mockMvc.perform(
-            delete("/api/events/$eid/guests/$gid")
+            delete("/events/$eid/guests/$gid")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         ).andExpect(status().isOk)
 

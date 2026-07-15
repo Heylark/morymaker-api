@@ -42,7 +42,7 @@ class IdleContentControllerTest(
 
     private fun createEvent(name: String = "대기화면 테스트 행사"): String {
         val response = mockMvc.perform(
-            post("/api/events")
+            post("/events")
                 .with(authenticatedAs(roles = listOf("SYSTEM_ADMIN")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"name":"$name"}"""),
@@ -54,7 +54,7 @@ class IdleContentControllerTest(
 
     private fun createContentRaw(eid: String, body: Map<String, Any?>, eventIds: List<String> = listOf(eid)) =
         mockMvc.perform(
-            post("/api/events/$eid/idle-contents")
+            post("/events/$eid/idle-contents")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = eventIds))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(body)),
@@ -96,7 +96,7 @@ class IdleContentControllerTest(
         createContent(eid, name = "첫번째", sortOrder = 1)
 
         mockMvc.perform(
-            get("/api/events/$eid/idle-contents")
+            get("/events/$eid/idle-contents")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         )
             .andExpect(status().isOk)
@@ -110,7 +110,7 @@ class IdleContentControllerTest(
         val cid = createContent(eid)
 
         mockMvc.perform(
-            put("/api/events/$eid/idle-contents/$cid")
+            put("/events/$eid/idle-contents/$cid")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"mode":"fullbleed","play":"10초 롤링","sortOrder":5}"""),
@@ -127,7 +127,7 @@ class IdleContentControllerTest(
         val eid = createEvent()
 
         mockMvc.perform(
-            put("/api/events/$eid/idle-contents/존재하지-않는-id")
+            put("/events/$eid/idle-contents/존재하지-않는-id")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"mode":"branded","play":null,"sortOrder":0}"""),
@@ -142,7 +142,7 @@ class IdleContentControllerTest(
         val eid = createEvent()
 
         mockMvc.perform(
-            get("/api/events/$eid/idle-contents")
+            get("/events/$eid/idle-contents")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf("다른-행사-id"))),
         )
             .andExpect(status().isForbidden)
@@ -163,7 +163,7 @@ class IdleContentControllerTest(
         val eid = createEvent()
 
         mockMvc.perform(
-            get("/api/events/$eid/idle-contents")
+            get("/events/$eid/idle-contents")
                 .with(authenticatedAs(roles = listOf("EVENT_STAFF"), eventIds = listOf(eid))),
         )
             .andExpect(status().isForbidden)
@@ -176,7 +176,7 @@ class IdleContentControllerTest(
         val cid = createContent(eid)
 
         mockMvc.perform(
-            put("/api/events/$eid/idle-contents/$cid")
+            put("/events/$eid/idle-contents/$cid")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf("다른-행사-id")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"mode":"fullbleed","play":"침입 시도","sortOrder":9}"""),
@@ -186,7 +186,7 @@ class IdleContentControllerTest(
 
         // 거부된 수정 시도가 실제로 반영되지 않았는지 실 DB로 재확인(담당 행사 관점 재조회).
         mockMvc.perform(
-            get("/api/events/$eid/idle-contents")
+            get("/events/$eid/idle-contents")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         )
             .andExpect(status().isOk)

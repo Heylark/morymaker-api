@@ -47,7 +47,7 @@ class ParkingRecordControllerTest(
 
     private fun createEvent(name: String = "주차 기록 테스트 행사"): String {
         val response = mockMvc.perform(
-            post("/api/events")
+            post("/events")
                 .with(authenticatedAs(roles = listOf("SYSTEM_ADMIN")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"name":"$name"}"""),
@@ -60,7 +60,7 @@ class ParkingRecordControllerTest(
     /** @return zoneId — part1="지하 2층", part2="A구역", startNo=1, slotCount=12 고정. */
     private fun createZone(eid: String): String {
         val response = mockMvc.perform(
-            post("/api/events/$eid/parking-zones")
+            post("/events/$eid/parking-zones")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"part1":"지하 2층","part2":"A구역","startNo":1,"slotCount":12}"""),
@@ -76,7 +76,7 @@ class ParkingRecordControllerTest(
     private fun registerGuest(eid: String, name: String, phone: String? = null, plate: String? = null): String {
         val body = objectMapper.writeValueAsString(mapOf("name" to name, "phone" to phone, "plate" to plate))
         val response = mockMvc.perform(
-            post("/api/events/$eid/guests")
+            post("/events/$eid/guests")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body),
@@ -96,7 +96,7 @@ class ParkingRecordControllerTest(
         registeredBy: String = "요원",
         eventIds: List<String> = listOf(eid),
     ) = mockMvc.perform(
-        post("/api/events/$eid/parking-records")
+        post("/events/$eid/parking-records")
             .with(authenticatedAs(roles = listOf("EVENT_STAFF"), eventIds = eventIds))
             .contentType(MediaType.APPLICATION_JSON)
             .content(
@@ -141,7 +141,7 @@ class ParkingRecordControllerTest(
 
         // 2건 생성 금지 — 같은 자리 목록에 1건만 존재해야 한다.
         val list = mockMvc.perform(
-            get("/api/events/$eid/parking-records")
+            get("/events/$eid/parking-records")
                 .with(authenticatedAs(roles = listOf("EVENT_STAFF"), eventIds = listOf(eid)))
                 .param("zoneId", zid),
         ).andExpect(status().isOk).andReturn().response.getContentAsString(StandardCharsets.UTF_8)
@@ -178,7 +178,7 @@ class ParkingRecordControllerTest(
 
         // 내 차량은 이동만 — 전체 목록에서 plate=12가3456 활성 기록은 1건이어야 한다(신규 insert 없음).
         val list = mockMvc.perform(
-            get("/api/events/$eid/parking-records")
+            get("/events/$eid/parking-records")
                 .with(authenticatedAs(roles = listOf("EVENT_STAFF"), eventIds = listOf(eid)))
                 .param("status", "주차중"),
         ).andExpect(status().isOk).andReturn().response.getContentAsString(StandardCharsets.UTF_8)
@@ -201,7 +201,7 @@ class ParkingRecordControllerTest(
             .andExpect(jsonPath("$.data.supersededRecord").doesNotExist())
 
         val list = mockMvc.perform(
-            get("/api/events/$eid/parking-records")
+            get("/events/$eid/parking-records")
                 .with(authenticatedAs(roles = listOf("EVENT_STAFF"), eventIds = listOf(eid)))
                 .param("status", "주차중"),
         ).andExpect(status().isOk).andReturn().response.getContentAsString(StandardCharsets.UTF_8)
@@ -225,7 +225,7 @@ class ParkingRecordControllerTest(
         val eid = createEvent()
 
         mockMvc.perform(
-            get("/api/events/$eid/parking-records")
+            get("/events/$eid/parking-records")
                 .with(authenticatedAs(roles = listOf("EVENT_STAFF"), eventIds = listOf("다른-행사-id"))),
         )
             .andExpect(status().isForbidden)
@@ -251,14 +251,14 @@ class ParkingRecordControllerTest(
         val id = objectMapper.readTree(created).get("data").get("record").get("id").asText()
 
         mockMvc.perform(
-            post("/api/events/$eid/parking-records/$id/checkout")
+            post("/events/$eid/parking-records/$id/checkout")
                 .with(authenticatedAs(roles = listOf("EVENT_STAFF"), eventIds = listOf("다른-행사-id"))),
         )
             .andExpect(status().isForbidden)
             .andExpect(jsonPath("$.error.code").value("EVENT_FORBIDDEN"))
 
         mockMvc.perform(
-            post("/api/events/$eid/parking-records/$id/review-clear")
+            post("/events/$eid/parking-records/$id/review-clear")
                 .with(authenticatedAs(roles = listOf("EVENT_STAFF"), eventIds = listOf("다른-행사-id"))),
         )
             .andExpect(status().isForbidden)
@@ -276,7 +276,7 @@ class ParkingRecordControllerTest(
         registerRecordRaw(eid, zid, slotSig(3), "56다5678").andExpect(status().isCreated)
 
         fun search(tail: String) = mockMvc.perform(
-            get("/api/events/$eid/parking-records")
+            get("/events/$eid/parking-records")
                 .with(authenticatedAs(roles = listOf("EVENT_STAFF"), eventIds = listOf(eid)))
                 .param("plateTail", tail),
         ).andExpect(status().isOk).andReturn().response.getContentAsString(StandardCharsets.UTF_8)
@@ -290,7 +290,7 @@ class ParkingRecordControllerTest(
 
     private fun guestStatus(eid: String, gid: String): String {
         val list = mockMvc.perform(
-            get("/api/events/$eid/guests")
+            get("/events/$eid/guests")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         ).andExpect(status().isOk).andReturn().response.getContentAsString(StandardCharsets.UTF_8)
         val item = objectMapper.readTree(list).get("data").first { it.get("id").asText() == gid }
@@ -332,7 +332,7 @@ class ParkingRecordControllerTest(
 
         // 매칭 성공 시 plate가 비어 있던 게스트는 백필된다(3-7).
         val list = mockMvc.perform(
-            get("/api/events/$eid/guests")
+            get("/events/$eid/guests")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         ).andExpect(status().isOk).andReturn().response.getContentAsString(StandardCharsets.UTF_8)
         val item = objectMapper.readTree(list).get("data").first { it.get("id").asText() == gid }
@@ -361,14 +361,14 @@ class ParkingRecordControllerTest(
         val id = objectMapper.readTree(created).get("data").get("record").get("id").asText()
 
         mockMvc.perform(
-            post("/api/events/$eid/parking-records/$id/checkout")
+            post("/events/$eid/parking-records/$id/checkout")
                 .with(authenticatedAs(roles = listOf("EVENT_STAFF"), eventIds = listOf(eid))),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.status").value("출차"))
 
         mockMvc.perform(
-            post("/api/events/$eid/parking-records/$id/checkout")
+            post("/events/$eid/parking-records/$id/checkout")
                 .with(authenticatedAs(roles = listOf("EVENT_STAFF"), eventIds = listOf(eid))),
         )
             .andExpect(status().isOk)
@@ -388,7 +388,7 @@ class ParkingRecordControllerTest(
         val id = objectMapper.readTree(superseded).get("data").get("record").get("id").asText()
 
         mockMvc.perform(
-            post("/api/events/$eid/parking-records/$id/review-clear")
+            post("/events/$eid/parking-records/$id/review-clear")
                 .with(authenticatedAs(roles = listOf("EVENT_STAFF"), eventIds = listOf(eid))),
         )
             .andExpect(status().isOk)

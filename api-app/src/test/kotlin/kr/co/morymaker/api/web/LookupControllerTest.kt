@@ -52,7 +52,7 @@ class LookupControllerTest(
 
     private fun createEvent(name: String = "통합조회 테스트 행사"): String {
         val response = mockMvc.perform(
-            post("/api/events")
+            post("/events")
                 .with(authenticatedAs(roles = listOf("SYSTEM_ADMIN")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"name":"$name"}"""),
@@ -65,7 +65,7 @@ class LookupControllerTest(
     private fun registerGuest(eid: String, name: String, plate: String? = null): String {
         val body = objectMapper.writeValueAsString(mapOf("name" to name, "plate" to plate))
         val response = mockMvc.perform(
-            post("/api/events/$eid/guests")
+            post("/events/$eid/guests")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body),
@@ -105,7 +105,7 @@ class LookupControllerTest(
         val eid = createEvent()
 
         mockMvc.perform(
-            get("/api/events/$eid/lookup?q=김진우")
+            get("/events/$eid/lookup?q=김진우")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf("다른-행사-id"))),
         )
             .andExpect(status().isForbidden)
@@ -117,7 +117,7 @@ class LookupControllerTest(
         val eid = createEvent()
 
         mockMvc.perform(
-            get("/api/events/$eid/lookup?q=김진우").with(authenticatedAs(roles = listOf("EVENT_ADMIN"))),
+            get("/events/$eid/lookup?q=김진우").with(authenticatedAs(roles = listOf("EVENT_ADMIN"))),
         )
             .andExpect(status().isForbidden)
             .andExpect(jsonPath("$.error.code").value("EVENT_FORBIDDEN"))
@@ -129,7 +129,7 @@ class LookupControllerTest(
         registerGuest(eid, "김진우")
 
         mockMvc.perform(
-            get("/api/events/$eid/lookup?q=김진우")
+            get("/events/$eid/lookup?q=김진우")
                 .with(authenticatedAs(roles = listOf("EVENT_STAFF"), eventIds = listOf(eid))),
         )
             .andExpect(status().isOk)
@@ -145,7 +145,7 @@ class LookupControllerTest(
         registerGuest(eid, "박서연")
 
         mockMvc.perform(
-            get("/api/events/$eid/lookup?q=김진우")
+            get("/events/$eid/lookup?q=김진우")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         )
             .andExpect(status().isOk)
@@ -161,7 +161,7 @@ class LookupControllerTest(
         registerGuest(eid, "김진호")
 
         mockMvc.perform(
-            get("/api/events/$eid/lookup?q=김진")
+            get("/events/$eid/lookup?q=김진")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         )
             .andExpect(status().isOk)
@@ -175,7 +175,7 @@ class LookupControllerTest(
         registerGuest(eid, "김진우")
 
         mockMvc.perform(
-            get("/api/events/$eid/lookup?q=없는이름")
+            get("/events/$eid/lookup?q=없는이름")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         )
             .andExpect(status().isOk)
@@ -189,7 +189,7 @@ class LookupControllerTest(
         registerGuest(eid, "이도현", plate = "12가3456")
 
         mockMvc.perform(
-            get("/api/events/$eid/lookup?q=3456")
+            get("/events/$eid/lookup?q=3456")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         )
             .andExpect(status().isOk)
@@ -203,12 +203,12 @@ class LookupControllerTest(
         val eid = createEvent()
         val gid = registerGuest(eid, "정하은")
         mockMvc.perform(
-            delete("/api/events/$eid/guests/$gid")
+            delete("/events/$eid/guests/$gid")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         ).andExpect(status().isOk)
 
         mockMvc.perform(
-            get("/api/events/$eid/lookup?q=정하은")
+            get("/events/$eid/lookup?q=정하은")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         )
             .andExpect(status().isOk)
@@ -224,7 +224,7 @@ class LookupControllerTest(
         assignSeatAndParking(eid, gid, seatLabel = "3번 테이블", plate = "78다9012", slotSig = "지하 2층·B구역·7")
 
         mockMvc.perform(
-            get("/api/events/$eid/lookup?q=최유나")
+            get("/events/$eid/lookup?q=최유나")
                 .with(authenticatedAs(roles = listOf("EVENT_STAFF"), eventIds = listOf(eid))),
         )
             .andExpect(status().isOk)
@@ -240,7 +240,7 @@ class LookupControllerTest(
         val eid = createEvent()
         val gid = registerGuest(eid, "김서준")
         val groupResponse = mockMvc.perform(
-            post("/api/events/$eid/seat-groups")
+            post("/events/$eid/seat-groups")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"label":"C열","numbering":true}"""),
@@ -249,7 +249,7 @@ class LookupControllerTest(
         // numbering ON 그룹의 §12-5 PUT은 그룹 전체 슬롯 세트를 원자 교체한다 — ord는 1..N 연속·
         // 유일해야 하므로 목표 ord(3번)까지의 빈좌석(1·2번)도 함께 제출해야 한다.
         mockMvc.perform(
-            put("/api/events/$eid/seat-assignments")
+            put("/events/$eid/seat-assignments")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
@@ -260,7 +260,7 @@ class LookupControllerTest(
         ).andExpect(status().isOk)
 
         mockMvc.perform(
-            get("/api/events/$eid/lookup?q=김서준")
+            get("/events/$eid/lookup?q=김서준")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         )
             .andExpect(status().isOk)
@@ -274,7 +274,7 @@ class LookupControllerTest(
         val eid = createEvent()
 
         mockMvc.perform(
-            get("/api/events/$eid/lookup").with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
+            get("/events/$eid/lookup").with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         )
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
@@ -285,7 +285,7 @@ class LookupControllerTest(
         val eid = createEvent()
 
         mockMvc.perform(
-            get("/api/events/$eid/lookup?q=")
+            get("/events/$eid/lookup?q=")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         )
             .andExpect(status().isBadRequest)
