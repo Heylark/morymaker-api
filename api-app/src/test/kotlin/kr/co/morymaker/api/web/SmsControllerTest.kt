@@ -41,7 +41,7 @@ import kotlin.test.assertTrue
  * `sms_log` INSERT 컬럼값(body_snapshot·name_snapshot)만 실 DB로 확인한다.
  *
  * `StatsControllerTest`·`GuestControllerTest`와 동일 컨벤션 — `.with(jwt())` 직접 주입,
- * `@Transactional` 자동 롤백, `event-base-url` 기본값(`http://localhost:3000`, application.yml)을
+ * `@Transactional` 자동 롤백, `event-base-url` 기본값(`http://localhost:3000/app`, application.yml)을
  * 그대로 사용한다(`PublicHubControllerTest`가 같은 기본값으로 QR URL을 검증하는 선례와 정합).
  */
 @SpringBootTest
@@ -206,12 +206,12 @@ class SmsControllerTest(
 
         assertTrue(rendered1.contains("가그룹"), "gid1 결과에는 gid1 소속(가그룹)만 나와야 한다")
         assertFalse(rendered1.contains("나그룹"), "이름이 같아도 gid2 소속(나그룹)이 섞이면 안 된다")
-        assertTrue(rendered1.contains("http://localhost:3000/u/$token1"))
+        assertTrue(rendered1.contains("http://localhost:3000/app/u/$token1"))
         assertFalse(rendered1.contains(token2), "gid1 결과에 gid2 토큰이 섞이면 안 된다")
 
         assertTrue(rendered2.contains("나그룹"))
         assertFalse(rendered2.contains("가그룹"))
-        assertTrue(rendered2.contains("http://localhost:3000/u/$token2"))
+        assertTrue(rendered2.contains("http://localhost:3000/app/u/$token2"))
         assertFalse(rendered2.contains(token1))
     }
 
@@ -228,7 +228,7 @@ class SmsControllerTest(
             preview(eid, gid).andExpect(status().isOk).andReturn().response.getContentAsString(StandardCharsets.UTF_8),
         ).get("data").get("rendered").asText()
 
-        assertEquals("확인: http://localhost:3000/u/$token", rendered)
+        assertEquals("확인: http://localhost:3000/app/u/$token", rendered)
         assertFalse(rendered.contains("http://http://"), "이중 스킴이 발생하면 안 된다")
     }
 

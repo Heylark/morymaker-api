@@ -198,7 +198,7 @@ class ParkingZoneControllerTest(
             .andExpect(jsonPath("$.data[0].slotNo").value(1))
             .andExpect(jsonPath("$.data[0].slotCode").value("$zid-01"))
             .andExpect(jsonPath("$.data[0].slotFullName").value("지하 2층 A구역 1"))
-            .andExpect(jsonPath("$.data[0].scanUrl").value("https://park.morymaker.co.kr/p/$zid-01"))
+            .andExpect(jsonPath("$.data[0].scanUrl").value("http://localhost:3000/app/p/$zid-01"))
     }
 
     @Test
@@ -291,7 +291,7 @@ class ParkingZoneControllerTest(
         assertEquals(setOf("지하 2층 A구역 1.png", "지하 2층 A구역 2.png", "지하 2층 A구역 3.png"), entries.keys)
 
         val decoded = decodeQr(entries["지하 2층 A구역 1.png"]!!)
-        assertEquals("https://park.morymaker.co.kr/p/$zid-01", decoded)
+        assertEquals("http://localhost:3000/app/p/$zid-01", decoded)
     }
 
     private fun decodeQr(png: ByteArray): String {

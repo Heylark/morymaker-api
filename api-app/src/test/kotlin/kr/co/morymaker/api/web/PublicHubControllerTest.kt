@@ -82,7 +82,7 @@ class PublicHubControllerTest(
             .andExpect(jsonPath("$.data.guest.name").value("이서연"))
             .andExpect(jsonPath("$.data.guest.plate").value("78다9012"))
             .andExpect(jsonPath("$.data.checkinQr.token").value(token))
-            .andExpect(jsonPath("$.data.checkinQr.url").value("http://localhost:3000/u/$token"))
+            .andExpect(jsonPath("$.data.checkinQr.url").value("http://localhost:3000/app/u/$token"))
             .andExpect(jsonPath("$.data.prereg.plateRegistered").value(true))
             .andExpect(jsonPath("$.data.parkingEntry.scanUrl").exists())
     }
