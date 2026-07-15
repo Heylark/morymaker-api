@@ -49,7 +49,7 @@ class PublicSecurityAdversarialTest(
 
     private fun createEvent(name: String = "적대적 테스트 행사"): String {
         val response = mockMvc.perform(
-            post("/api/events")
+            post("/events")
                 .with(authenticatedAs(roles = listOf("SYSTEM_ADMIN")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"name":"$name"}"""),
@@ -62,7 +62,7 @@ class PublicSecurityAdversarialTest(
     /** @return (guestId, token) */
     private fun registerGuest(eid: String, name: String): Pair<String, String> {
         val response = mockMvc.perform(
-            post("/api/events/$eid/guests")
+            post("/events/$eid/guests")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"name":"$name"}"""),
@@ -124,7 +124,7 @@ class PublicSecurityAdversarialTest(
         val beforeCount = guestCountByEvent(eid)
 
         mockMvc.perform(
-            post("/api/public/u/no-such-token-adversarial/prereg-plate")
+            post("/public/u/no-such-token-adversarial/prereg-plate")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"plate":"99하9999"}"""),
         ).andExpect(status().isNotFound)
@@ -143,7 +143,7 @@ class PublicSecurityAdversarialTest(
         val before = guestCountGlobal()
 
         mockMvc.perform(
-            post("/api/public/r/${UUID.randomUUID()}")
+            post("/public/r/${UUID.randomUUID()}")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"name":"적대적 침입 시도"}"""),
         ).andExpect(status().isNotFound)
@@ -158,7 +158,7 @@ class PublicSecurityAdversarialTest(
         val before = guestCountByEvent(eid)
 
         mockMvc.perform(
-            post("/api/public/r/$eid")
+            post("/public/r/$eid")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"name":"종료행사 등록시도"}"""),
         ).andExpect(status().isConflict)
@@ -177,7 +177,7 @@ class PublicSecurityAdversarialTest(
         val (_, tokenA) = registerGuest(eidA, "적대적 시나리오 참석자")
 
         mockMvc.perform(
-            post("/api/public/u/$tokenA/prereg-plate")
+            post("/public/u/$tokenA/prereg-plate")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"plate":"$sharedPlate"}"""),
         )
@@ -185,7 +185,7 @@ class PublicSecurityAdversarialTest(
             .andExpect(jsonPath("$.data.plate").value(sharedPlate))
 
         // event A guest는 plate만 백필되고 방문 전이는 없어야 한다(같은 event 안에는 매칭 기록이 없으므로).
-        mockMvc.perform(get("/api/public/u/$tokenA"))
+        mockMvc.perform(get("/public/u/$tokenA"))
             .andExpect(jsonPath("$.data.guest.status").value("대기"))
 
         // event B의 주차기록은 여전히 guest_id가 비어 있어야 한다 — cross-event로 연결되면 안 된다.
@@ -200,7 +200,7 @@ class PublicSecurityAdversarialTest(
         val (guestIdB, _) = registerGuest(eid, "참석자B")
 
         mockMvc.perform(
-            post("/api/public/u/$tokenA/prereg-plate")
+            post("/public/u/$tokenA/prereg-plate")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"plate":"11나1111"}"""),
         ).andExpect(status().isOk)

@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController
  * 담당한다 — 이 컨트롤러는 `@PreAuthorize`를 두지 않는다.
  */
 @RestController
-@RequestMapping("/api/public/r/{eventCode}")
+@RequestMapping("/public/r/{eventCode}")
 class PublicOnsiteController(
     private val publicOnsiteUseCase: PublicOnsiteUseCase,
     private val publicProperties: PublicProperties,

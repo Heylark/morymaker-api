@@ -46,7 +46,7 @@ class PublicRateLimitEndToEndTest(
 
     private fun createEvent(name: String = "rate limit 종단 테스트 행사"): String {
         val response = mockMvc.perform(
-            post("/api/events")
+            post("/events")
                 .with(authenticatedAs(roles = listOf("SYSTEM_ADMIN")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"name":"$name"}"""),
@@ -62,14 +62,14 @@ class PublicRateLimitEndToEndTest(
 
         repeat(3) { i ->
             mockMvc.perform(
-                post("/api/public/r/$eid")
+                post("/public/r/$eid")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""{"name":"현장등록-$i"}"""),
             ).andExpect(status().isCreated)
         }
 
         mockMvc.perform(
-            post("/api/public/r/$eid")
+            post("/public/r/$eid")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"name":"현장등록-초과"}"""),
         )
@@ -77,7 +77,7 @@ class PublicRateLimitEndToEndTest(
             .andExpect(jsonPath("$.error.code").value("RATE_LIMIT_EXCEEDED"))
 
         // GET(폼 조회)은 정책상 rate limit 대상이 아니다 — 같은 IP의 POST가 막힌 뒤에도 계속 통과해야 한다.
-        mockMvc.perform(get("/api/public/r/$eid"))
+        mockMvc.perform(get("/public/r/$eid"))
             .andExpect(status().isOk)
     }
 }

@@ -25,7 +25,7 @@ import java.nio.charset.StandardCharsets
  * 가드 없이 서비스 첫 줄 `assertAccess(eid)`로 격리된다.
  */
 @RestController
-@RequestMapping("/api/events/{eid}/stats")
+@RequestMapping("/events/{eid}/stats")
 class StatsController(
     private val statsUseCase: StatsUseCase,
 ) {

@@ -21,10 +21,31 @@ class PublicRateLimitInterceptorTest {
         ),
     )
 
-    private fun postRequest(ip: String) = MockHttpServletRequest("POST", "/api/public/r/ev1").apply { remoteAddr = ip }
-    private fun getRequest(ip: String) = MockHttpServletRequest("GET", "/api/public/r/ev1").apply { remoteAddr = ip }
-    private fun kioskGetRequest(ip: String, path: String = "/api/public/events/ev1/attendees") =
-        MockHttpServletRequest("GET", path).apply { remoteAddr = ip }
+    // 프로덕션 컨테이너가 만드는 3요소를 그대로 재현한다 — 앞단이 붙이는 외부 경로(requestURI)와
+    // 앱이 보는 경로(servletPath)가 다르다는 점이 이 인터셉터 판정의 핵심이라, 테스트가 그 차이를
+    // 재현하지 않으면 판정식이 바뀌어도 눈치채지 못한다.
+    private fun postRequest(ip: String) = MockHttpServletRequest("POST", "$CONTEXT_PATH/public/r/ev1").apply {
+        contextPath = CONTEXT_PATH
+        servletPath = "/public/r/ev1"
+        remoteAddr = ip
+    }
+
+    private fun getRequest(ip: String) = MockHttpServletRequest("GET", "$CONTEXT_PATH/public/r/ev1").apply {
+        contextPath = CONTEXT_PATH
+        servletPath = "/public/r/ev1"
+        remoteAddr = ip
+    }
+
+    private fun kioskGetRequest(ip: String, appPath: String = "/public/events/ev1/attendees") =
+        MockHttpServletRequest("GET", "$CONTEXT_PATH$appPath").apply {
+            contextPath = CONTEXT_PATH
+            servletPath = appPath
+            remoteAddr = ip
+        }
+
+    companion object {
+        private const val CONTEXT_PATH = "/api"
+    }
 
     @Test
     fun `한도 이내 요청은 통과한다`() {
@@ -87,14 +108,14 @@ class PublicRateLimitInterceptorTest {
         val target = interceptor(limit = 1)
         assertTrue(
             target.preHandle(
-                kioskGetRequest("8.8.8.8", "/api/public/events/ev1/parking-search"),
+                kioskGetRequest("8.8.8.8", "/public/events/ev1/parking-search"),
                 MockHttpServletResponse(),
                 Any(),
             ),
         )
         assertFailsWith<RateLimitExceededException> {
             target.preHandle(
-                kioskGetRequest("8.8.8.8", "/api/public/events/ev1/parking-search"),
+                kioskGetRequest("8.8.8.8", "/public/events/ev1/parking-search"),
                 MockHttpServletResponse(),
                 Any(),
             )
@@ -105,7 +126,11 @@ class PublicRateLimitInterceptorTest {
     fun `kiosk POST 체크인 요청도 검사 대상이다(POST 분기 재사용)`() {
         val target = interceptor(limit = 1)
         val checkinRequest = { ip: String ->
-            MockHttpServletRequest("POST", "/api/public/events/ev1/checkin").apply { remoteAddr = ip }
+            MockHttpServletRequest("POST", "$CONTEXT_PATH/public/events/ev1/checkin").apply {
+                contextPath = CONTEXT_PATH
+                servletPath = "/public/events/ev1/checkin"
+                remoteAddr = ip
+            }
         }
         assertTrue(target.preHandle(checkinRequest("9.9.9.9"), MockHttpServletResponse(), Any()))
         assertFailsWith<RateLimitExceededException> {

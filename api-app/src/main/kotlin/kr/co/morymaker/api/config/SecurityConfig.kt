@@ -116,7 +116,7 @@ class SecurityConfig(
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             .authorizeHttpRequests { auth ->
                 auth
-                    .requestMatchers("/api/public/**").permitAll()
+                    .requestMatchers("/public/**").permitAll()
                     .requestMatchers("/actuator/health").permitAll()
                     .anyRequest().authenticated()
             }

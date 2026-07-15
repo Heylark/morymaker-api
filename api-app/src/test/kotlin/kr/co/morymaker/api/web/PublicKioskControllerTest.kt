@@ -53,7 +53,7 @@ class PublicKioskControllerTest(
 
     private fun createEvent(name: String = "kiosk 공개 API 테스트 행사"): String {
         val response = mockMvc.perform(
-            post("/api/events")
+            post("/events")
                 .with(authenticatedAs(roles = listOf("SYSTEM_ADMIN")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"name":"$name"}"""),
@@ -70,7 +70,7 @@ class PublicKioskControllerTest(
     private fun registerGuest(eid: String, name: String, plate: String? = null): String {
         val body = objectMapper.writeValueAsString(mapOf("name" to name, "plate" to plate))
         val response = mockMvc.perform(
-            post("/api/events/$eid/guests")
+            post("/events/$eid/guests")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body),
@@ -115,7 +115,7 @@ class PublicKioskControllerTest(
         val eid = createEvent()
         registerGuest(eid, "김진우")
 
-        mockMvc.perform(get("/api/public/events/$eid/attendees?name=김진우"))
+        mockMvc.perform(get("/public/events/$eid/attendees?name=김진우"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.length()").value(1))
     }
@@ -124,7 +124,7 @@ class PublicKioskControllerTest(
 
     @Test
     fun `존재하지 않는 eid로 이름검색하면 404를 받는다`() {
-        mockMvc.perform(get("/api/public/events/${UUID.randomUUID()}/attendees?name=김진우"))
+        mockMvc.perform(get("/public/events/${UUID.randomUUID()}/attendees?name=김진우"))
             .andExpect(status().isNotFound)
     }
 
@@ -133,7 +133,7 @@ class PublicKioskControllerTest(
         val eid = createEvent()
         closeEvent(eid)
 
-        mockMvc.perform(get("/api/public/events/$eid/attendees?name=김진우"))
+        mockMvc.perform(get("/public/events/$eid/attendees?name=김진우"))
             .andExpect(status().isConflict)
             .andExpect(jsonPath("$.error.code").value("EVENT_CLOSED"))
     }
@@ -146,7 +146,7 @@ class PublicKioskControllerTest(
         val gid = registerGuest(eid, "김진우", plate = "12가3456")
         assignSeat(eid, gid, "A-12")
 
-        mockMvc.perform(get("/api/public/events/$eid/attendees?name=김진우"))
+        mockMvc.perform(get("/public/events/$eid/attendees?name=김진우"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.meta.searchState").value("ONE"))
             .andExpect(jsonPath("$.data[0].guestId").value(gid))
@@ -163,7 +163,7 @@ class PublicKioskControllerTest(
     fun `이름이 2자 미만이면 400을 받는다(단일문자 열거 차단)`() {
         val eid = createEvent()
 
-        mockMvc.perform(get("/api/public/events/$eid/attendees?name=김"))
+        mockMvc.perform(get("/public/events/$eid/attendees?name=김"))
             .andExpect(status().isBadRequest)
     }
 
@@ -172,7 +172,7 @@ class PublicKioskControllerTest(
         val eid = createEvent()
         registerGuest(eid, "김진우")
 
-        mockMvc.perform(get("/api/public/events/$eid/attendees?name=없는이름"))
+        mockMvc.perform(get("/public/events/$eid/attendees?name=없는이름"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.meta.searchState").value("NONE"))
             .andExpect(jsonPath("$.data.length()").value(0))
@@ -184,7 +184,7 @@ class PublicKioskControllerTest(
         val eidB = createEvent("행사 B")
         registerGuest(eidB, "김진우")
 
-        mockMvc.perform(get("/api/public/events/$eidA/attendees?name=김진우"))
+        mockMvc.perform(get("/public/events/$eidA/attendees?name=김진우"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.length()").value(0))
     }
@@ -198,7 +198,7 @@ class PublicKioskControllerTest(
         assignSeat(eid, gid, "B-07")
 
         mockMvc.perform(
-            post("/api/public/events/$eid/checkin")
+            post("/public/events/$eid/checkin")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"guestId":"$gid"}"""),
         )
@@ -220,7 +220,7 @@ class PublicKioskControllerTest(
         insertParkedRecord(eid, "12가3456", gid = gid, slotSig = "지하 2층·A구역·3")
 
         mockMvc.perform(
-            post("/api/public/events/$eid/checkin")
+            post("/public/events/$eid/checkin")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"guestId":"$gid"}"""),
         )
@@ -235,13 +235,13 @@ class PublicKioskControllerTest(
         val gid = registerGuest(eid, "정하은")
 
         mockMvc.perform(
-            post("/api/public/events/$eid/checkin")
+            post("/public/events/$eid/checkin")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"guestId":"$gid"}"""),
         ).andExpect(status().isOk).andExpect(jsonPath("$.data.resultCode").value("CHECKED_IN"))
 
         mockMvc.perform(
-            post("/api/public/events/$eid/checkin")
+            post("/public/events/$eid/checkin")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"guestId":"$gid"}"""),
         )
@@ -254,7 +254,7 @@ class PublicKioskControllerTest(
         val eid = createEvent()
 
         mockMvc.perform(
-            post("/api/public/events/$eid/checkin")
+            post("/public/events/$eid/checkin")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{}"""),
         ).andExpect(status().isBadRequest)
@@ -267,7 +267,7 @@ class PublicKioskControllerTest(
         val gidB = registerGuest(eidB, "타행사참석자")
 
         mockMvc.perform(
-            post("/api/public/events/$eidA/checkin")
+            post("/public/events/$eidA/checkin")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"guestId":"$gidB"}"""),
         ).andExpect(status().isNotFound)
@@ -280,7 +280,7 @@ class PublicKioskControllerTest(
         val eid = createEvent()
         insertParkedRecord(eid, "12가3456", slotSig = "지하 2층·A구역·3")
 
-        mockMvc.perform(get("/api/public/events/$eid/parking-search?plateTail=3456"))
+        mockMvc.perform(get("/public/events/$eid/parking-search?plateTail=3456"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.length()").value(1))
             .andExpect(jsonPath("$.data[0].plate").value("12가3456"))
@@ -295,7 +295,7 @@ class PublicKioskControllerTest(
     fun `plateTail이 4자리가 아니면 400을 받는다`() {
         val eid = createEvent()
 
-        mockMvc.perform(get("/api/public/events/$eid/parking-search?plateTail=123"))
+        mockMvc.perform(get("/public/events/$eid/parking-search?plateTail=123"))
             .andExpect(status().isBadRequest)
     }
 
@@ -305,7 +305,7 @@ class PublicKioskControllerTest(
         val recordId = insertParkedRecord(eid, "99하9999")
         jdbcTemplate.update("UPDATE parking_record SET status = '출차' WHERE id = ?", recordId)
 
-        mockMvc.perform(get("/api/public/events/$eid/parking-search?plateTail=9999"))
+        mockMvc.perform(get("/public/events/$eid/parking-search?plateTail=9999"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.length()").value(0))
     }
@@ -316,7 +316,7 @@ class PublicKioskControllerTest(
         val eidB = createEvent("행사 B")
         insertParkedRecord(eidB, "77가7777")
 
-        mockMvc.perform(get("/api/public/events/$eidA/parking-search?plateTail=7777"))
+        mockMvc.perform(get("/public/events/$eidA/parking-search?plateTail=7777"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.length()").value(0))
     }

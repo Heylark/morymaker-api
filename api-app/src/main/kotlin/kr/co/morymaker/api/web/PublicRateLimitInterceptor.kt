@@ -37,7 +37,7 @@ class PublicRateLimitInterceptor(
         handler: Any,
     ): Boolean {
         val isPost = request.method == HttpMethod.POST.name()
-        val isKioskGet = request.method == HttpMethod.GET.name() && request.requestURI.startsWith(KIOSK_PATH_PREFIX)
+        val isKioskGet = request.method == HttpMethod.GET.name() && request.servletPath.startsWith(KIOSK_PATH_PREFIX)
         if (!isPost && !isKioskGet) return true
 
         val key = request.remoteAddr ?: return true
@@ -61,6 +61,6 @@ class PublicRateLimitInterceptor(
 
     companion object {
         /** kiosk 공개 조회 경로 접두사 — `WebMvcConfig`의 kiosk 개별 등록 패턴과 짝을 이룬다. */
-        const val KIOSK_PATH_PREFIX = "/api/public/events/"
+        const val KIOSK_PATH_PREFIX = "/public/events/"
     }
 }

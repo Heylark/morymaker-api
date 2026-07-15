@@ -54,7 +54,7 @@ class EventControllerTest(
     private fun createEventAsSystemAdmin(name: String): String {
         val body = """{"name":"$name"}"""
         val response = mockMvc.perform(
-            post("/api/events")
+            post("/events")
                 .with(authenticatedAs(roles = listOf("SYSTEM_ADMIN")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body),
@@ -68,7 +68,7 @@ class EventControllerTest(
     @Test
     fun `SYSTEM_ADMIN은 행사를 생성할 수 있고 기본값이 준비중 active false로 채워진다`() {
         mockMvc.perform(
-            post("/api/events")
+            post("/events")
                 .with(authenticatedAs(roles = listOf("SYSTEM_ADMIN")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"name":"창립 30주년 기념식"}"""),
@@ -82,7 +82,7 @@ class EventControllerTest(
     @Test
     fun `name 없이 생성 요청하면 400 VALIDATION_FAILED를 반환한다`() {
         mockMvc.perform(
-            post("/api/events")
+            post("/events")
                 .with(authenticatedAs(roles = listOf("SYSTEM_ADMIN")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{}"""),
@@ -95,7 +95,7 @@ class EventControllerTest(
     @Test
     fun `EVENT_STAFF는 행사 생성 시 403 ROLE_FORBIDDEN을 받는다`() {
         mockMvc.perform(
-            post("/api/events")
+            post("/events")
                 .with(authenticatedAs(roles = listOf("EVENT_STAFF")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"name":"권한 없는 시도"}"""),
@@ -109,7 +109,7 @@ class EventControllerTest(
         val id = createEventAsSystemAdmin("SYSTEM_ADMIN 단건 조회 대상")
 
         mockMvc.perform(
-            get("/api/events/$id").with(authenticatedAs(roles = listOf("SYSTEM_ADMIN"))),
+            get("/events/$id").with(authenticatedAs(roles = listOf("SYSTEM_ADMIN"))),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.id").value(id))
@@ -120,7 +120,7 @@ class EventControllerTest(
         val id = createEventAsSystemAdmin("EVENT_ADMIN 담당 행사")
 
         mockMvc.perform(
-            get("/api/events/$id")
+            get("/events/$id")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(id))),
         )
             .andExpect(status().isOk)
@@ -131,7 +131,7 @@ class EventControllerTest(
         val id = createEventAsSystemAdmin("다른 담당자 행사")
 
         mockMvc.perform(
-            get("/api/events/$id")
+            get("/events/$id")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf("완전히-다른-행사-id"))),
         )
             .andExpect(status().isForbidden)
@@ -143,7 +143,7 @@ class EventControllerTest(
         val id = createEventAsSystemAdmin("클레임 부재 검증 대상")
 
         mockMvc.perform(
-            get("/api/events/$id").with(authenticatedAs(roles = listOf("EVENT_ADMIN"))),
+            get("/events/$id").with(authenticatedAs(roles = listOf("EVENT_ADMIN"))),
         )
             .andExpect(status().isForbidden)
             .andExpect(jsonPath("$.error.code").value("EVENT_FORBIDDEN"))
@@ -152,7 +152,7 @@ class EventControllerTest(
     @Test
     fun `존재하지 않는 행사를 SYSTEM_ADMIN이 조회하면 404를 받는다`() {
         mockMvc.perform(
-            get("/api/events/존재하지-않는-id").with(authenticatedAs(roles = listOf("SYSTEM_ADMIN"))),
+            get("/events/존재하지-않는-id").with(authenticatedAs(roles = listOf("SYSTEM_ADMIN"))),
         )
             .andExpect(status().isNotFound)
     }
@@ -162,7 +162,7 @@ class EventControllerTest(
         createEventAsSystemAdmin("목록 노출 확인용")
 
         mockMvc.perform(
-            get("/api/events").with(authenticatedAs(roles = listOf("SYSTEM_ADMIN"))),
+            get("/events").with(authenticatedAs(roles = listOf("SYSTEM_ADMIN"))),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data").isArray)
@@ -171,7 +171,7 @@ class EventControllerTest(
     @Test
     fun `담당 행사가 없는 EVENT_ADMIN의 목록 조회는 빈 배열을 반환한다`() {
         mockMvc.perform(
-            get("/api/events")
+            get("/events")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = emptyList())),
         )
             .andExpect(status().isOk)
@@ -186,7 +186,7 @@ class EventControllerTest(
         val id = createEventAsSystemAdmin("수정 대상 행사")
 
         mockMvc.perform(
-            put("/api/events/$id")
+            put("/events/$id")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(id)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"name":"수정된 행사명","place":"새 장소","status":"운영중","active":true}"""),
@@ -203,7 +203,7 @@ class EventControllerTest(
         val id = createEventAsSystemAdmin("게이트 회귀 대상")
         // 최초 브랜딩 저장(§11-1) — 이후 §2-4가 이 값을 건드리지 않아야 한다.
         mockMvc.perform(
-            put("/api/events/$id/branding")
+            put("/events/$id/branding")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(id)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"bgColor":"#0c1322","pointColor":"#c9a24a","titleColor":"#ffffff","bodyColor":"#d9d9d9"}"""),
@@ -211,7 +211,7 @@ class EventControllerTest(
 
         // §2-4 PUT에 bgColor를 얹어 보내도(EventUpdateRequest엔 필드 자체가 없어 역직렬화 시 무시) 컬러는 불변.
         mockMvc.perform(
-            put("/api/events/$id")
+            put("/events/$id")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(id)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"name":"게이트 회귀 대상","status":"준비","active":false,"bgColor":"#ff0000"}"""),
@@ -220,7 +220,7 @@ class EventControllerTest(
             .andExpect(jsonPath("$.data.bgColor").value("#0c1322"))
 
         mockMvc.perform(
-            get("/api/events/$id").with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(id))),
+            get("/events/$id").with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(id))),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.bgColor").value("#0c1322"))
@@ -232,7 +232,7 @@ class EventControllerTest(
         val id = createEventAsSystemAdmin("검증 대상")
 
         mockMvc.perform(
-            put("/api/events/$id")
+            put("/events/$id")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(id)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"status":"준비","active":false}"""),
@@ -246,7 +246,7 @@ class EventControllerTest(
         val id = createEventAsSystemAdmin("타 담당자 수정 대상")
 
         mockMvc.perform(
-            put("/api/events/$id")
+            put("/events/$id")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf("다른-행사-id")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"name":"타 담당자 수정 대상","status":"준비","active":false}"""),
@@ -262,7 +262,7 @@ class EventControllerTest(
         val id = createEventAsSystemAdmin("브랜딩 저장 대상")
 
         mockMvc.perform(
-            put("/api/events/$id/branding")
+            put("/events/$id/branding")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(id)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
@@ -281,7 +281,7 @@ class EventControllerTest(
         val id = createEventAsSystemAdmin("컬러 검증 대상")
 
         mockMvc.perform(
-            put("/api/events/$id/branding")
+            put("/events/$id/branding")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(id)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"bgColor":"blue"}"""),
@@ -295,7 +295,7 @@ class EventControllerTest(
         val id = createEventAsSystemAdmin("kv만 수정 대상")
 
         mockMvc.perform(
-            put("/api/events/$id/branding")
+            put("/events/$id/branding")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(id)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"kv":"업데이트된 KV","defaultIdleMode":"fullbleed"}"""),
@@ -310,7 +310,7 @@ class EventControllerTest(
         val id = createEventAsSystemAdmin("브랜딩 타 담당자 대상")
 
         mockMvc.perform(
-            put("/api/events/$id/branding")
+            put("/events/$id/branding")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf("다른-행사-id")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"bgColor":"#ff0000"}"""),
@@ -324,7 +324,7 @@ class EventControllerTest(
         val id = createEventAsSystemAdmin("브랜딩 역할 검증 대상")
 
         mockMvc.perform(
-            put("/api/events/$id/branding")
+            put("/events/$id/branding")
                 .with(authenticatedAs(roles = listOf("EVENT_STAFF"), eventIds = listOf(id)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"bgColor":"#ff0000"}"""),

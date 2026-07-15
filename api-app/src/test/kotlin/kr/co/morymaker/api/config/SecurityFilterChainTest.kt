@@ -14,7 +14,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
 /**
  * SecurityFilterChain 전체 배선 회귀 테스트 — 이번 범위에는 실 컨트롤러가 없어(EventController는
- * 후속 범위) `/api/probe`처럼 매핑되지 않은 보호 경로를 사용한다. Spring Security는 컨트롤러
+ * 후속 범위) `/probe`처럼 매핑되지 않은 보호 경로를 사용한다. Spring Security는 컨트롤러
  * 매핑보다 먼저 필터 체인에서 인증 여부를 판단하므로, 핸들러 부재와 무관하게 인증 실패/통과를
  * 검증할 수 있다(인증 실패 시 401이 필터 단계에서 즉시 반환됨).
  *
@@ -32,7 +32,7 @@ class SecurityFilterChainTest(
 
     @Test
     fun `Authorization 헤더 없이 보호 경로 접근 시 401과 UNAUTHENTICATED를 반환한다`() {
-        mockMvc.perform(get("/api/probe"))
+        mockMvc.perform(get("/probe"))
             .andExpect(status().isUnauthorized)
             .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
             .andExpect(jsonPath("$.error.code").value("UNAUTHENTICATED"))
@@ -41,7 +41,7 @@ class SecurityFilterChainTest(
     @Test
     fun `유효한 JWT로 요청하면 인증 필터를 통과한다 (401이 아님)`() {
         mockMvc.perform(
-            get("/api/probe").with(jwt().jwt { it.claim("roles", listOf("SYSTEM_ADMIN")) }),
+            get("/probe").with(jwt().jwt { it.claim("roles", listOf("SYSTEM_ADMIN")) }),
         )
             // 컨트롤러가 아직 없어 404이지만, 401/403이 아니라는 사실 자체가 인증 통과의 증거다.
             .andExpect(status().isNotFound)

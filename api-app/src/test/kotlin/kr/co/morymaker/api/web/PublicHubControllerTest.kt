@@ -45,7 +45,7 @@ class PublicHubControllerTest(
 
     private fun createEvent(name: String = "공개 허브 테스트 행사"): String {
         val response = mockMvc.perform(
-            post("/api/events")
+            post("/events")
                 .with(authenticatedAs(roles = listOf("SYSTEM_ADMIN")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"name":"$name"}"""),
@@ -59,7 +59,7 @@ class PublicHubControllerTest(
     private fun registerGuest(eid: String, name: String, plate: String? = null): Pair<String, String> {
         val body = objectMapper.writeValueAsString(mapOf("name" to name, "plate" to plate))
         val response = mockMvc.perform(
-            post("/api/events/$eid/guests")
+            post("/events/$eid/guests")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body),
@@ -77,19 +77,19 @@ class PublicHubControllerTest(
         val eid = createEvent()
         val (_, token) = registerGuest(eid, "이서연", plate = "78다9012")
 
-        mockMvc.perform(get("/api/public/u/$token"))
+        mockMvc.perform(get("/public/u/$token"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.guest.name").value("이서연"))
             .andExpect(jsonPath("$.data.guest.plate").value("78다9012"))
             .andExpect(jsonPath("$.data.checkinQr.token").value(token))
-            .andExpect(jsonPath("$.data.checkinQr.url").value("http://localhost:3000/u/$token"))
+            .andExpect(jsonPath("$.data.checkinQr.url").value("http://localhost:3000/app/u/$token"))
             .andExpect(jsonPath("$.data.prereg.plateRegistered").value(true))
             .andExpect(jsonPath("$.data.parkingEntry.scanUrl").exists())
     }
 
     @Test
     fun `무효 token은 404 NOT_FOUND를 받는다(enumeration 방지 — 단일 코드)`() {
-        mockMvc.perform(get("/api/public/u/no-such-token"))
+        mockMvc.perform(get("/public/u/no-such-token"))
             .andExpect(status().isNotFound)
             .andExpect(jsonPath("$.error.code").value("NOT_FOUND"))
     }
@@ -101,11 +101,11 @@ class PublicHubControllerTest(
         val (_, tokenA) = registerGuest(eidA, "김진우")
         val (_, tokenB) = registerGuest(eidB, "박서연")
 
-        mockMvc.perform(get("/api/public/u/$tokenA"))
+        mockMvc.perform(get("/public/u/$tokenA"))
             .andExpect(jsonPath("$.data.event.name").value("행사 A"))
             .andExpect(jsonPath("$.data.guest.name").value("김진우"))
 
-        mockMvc.perform(get("/api/public/u/$tokenB"))
+        mockMvc.perform(get("/public/u/$tokenB"))
             .andExpect(jsonPath("$.data.event.name").value("행사 B"))
             .andExpect(jsonPath("$.data.guest.name").value("박서연"))
     }
@@ -116,7 +116,7 @@ class PublicHubControllerTest(
         val (_, token) = registerGuest(eid, "최유나")
 
         repeat(3) {
-            mockMvc.perform(get("/api/public/u/$token"))
+            mockMvc.perform(get("/public/u/$token"))
                 .andExpect(status().isOk)
                 .andExpect(jsonPath("$.data.guest.status").value("대기"))
         }
@@ -130,14 +130,14 @@ class PublicHubControllerTest(
         val (_, token) = registerGuest(eid, "정하은")
 
         mockMvc.perform(
-            post("/api/public/u/$token/prereg-plate")
+            post("/public/u/$token/prereg-plate")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"plate":"12가3456"}"""),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.plate").value("12가3456"))
 
-        mockMvc.perform(get("/api/public/u/$token"))
+        mockMvc.perform(get("/public/u/$token"))
             .andExpect(jsonPath("$.data.guest.plate").value("12가3456"))
             .andExpect(jsonPath("$.data.prereg.plateRegistered").value(true))
     }
@@ -145,7 +145,7 @@ class PublicHubControllerTest(
     @Test
     fun `무효 token으로 사전등록을 시도하면 404를 받는다`() {
         mockMvc.perform(
-            post("/api/public/u/no-such-token/prereg-plate")
+            post("/public/u/no-such-token/prereg-plate")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"plate":"12가3456"}"""),
         )
@@ -158,7 +158,7 @@ class PublicHubControllerTest(
         val (_, token) = registerGuest(eid, "홍길동")
 
         mockMvc.perform(
-            post("/api/public/u/$token/prereg-plate")
+            post("/public/u/$token/prereg-plate")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"plate":""}"""),
         )
@@ -173,7 +173,7 @@ class PublicHubControllerTest(
         val eid = createEvent()
         val (gid, token) = registerGuest(eid, "이도현")
         val groupResponse = mockMvc.perform(
-            post("/api/events/$eid/seat-groups")
+            post("/events/$eid/seat-groups")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"label":"B열","numbering":true}"""),
@@ -182,7 +182,7 @@ class PublicHubControllerTest(
         // numbering ON 그룹의 §12-5 PUT은 그룹 전체 슬롯 세트를 원자 교체한다 — ord는 1..N 연속·
         // 유일해야 하므로 목표 ord(3번)까지의 빈좌석(1·2번)도 함께 제출해야 한다.
         mockMvc.perform(
-            put("/api/events/$eid/seat-assignments")
+            put("/events/$eid/seat-assignments")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
@@ -192,7 +192,7 @@ class PublicHubControllerTest(
                 ),
         ).andExpect(status().isOk)
 
-        mockMvc.perform(get("/api/public/u/$token"))
+        mockMvc.perform(get("/public/u/$token"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.guest.seatLabel").value("B열 3번"))
     }

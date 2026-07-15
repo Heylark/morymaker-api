@@ -41,7 +41,7 @@ import kotlin.test.assertTrue
  * `sms_log` INSERT 컬럼값(body_snapshot·name_snapshot)만 실 DB로 확인한다.
  *
  * `StatsControllerTest`·`GuestControllerTest`와 동일 컨벤션 — `.with(jwt())` 직접 주입,
- * `@Transactional` 자동 롤백, `event-base-url` 기본값(`http://localhost:3000`, application.yml)을
+ * `@Transactional` 자동 롤백, `event-base-url` 기본값(`http://localhost:3000/app`, application.yml)을
  * 그대로 사용한다(`PublicHubControllerTest`가 같은 기본값으로 QR URL을 검증하는 선례와 정합).
  */
 @SpringBootTest
@@ -64,7 +64,7 @@ class SmsControllerTest(
     private fun createEvent(name: String = "문자 테스트 행사", place: String? = null): String {
         val body = objectMapper.writeValueAsString(mapOf("name" to name, "place" to place))
         val response = mockMvc.perform(
-            post("/api/events")
+            post("/events")
                 .with(authenticatedAs(roles = listOf("SYSTEM_ADMIN")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body),
@@ -77,7 +77,7 @@ class SmsControllerTest(
     private fun registerGuest(eid: String, name: String, org: String? = null, phone: String? = "010-1234-5678"): String {
         val body = objectMapper.writeValueAsString(mapOf("name" to name, "org" to org, "phone" to phone))
         val response = mockMvc.perform(
-            post("/api/events/$eid/guests")
+            post("/events/$eid/guests")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body),
@@ -92,7 +92,7 @@ class SmsControllerTest(
 
     private fun cancelGuest(eid: String, gid: String, deleteSmsLog: Boolean = false) {
         mockMvc.perform(
-            delete("/api/events/$eid/guests/$gid")
+            delete("/events/$eid/guests/$gid")
                 .param("deleteSmsLog", deleteSmsLog.toString())
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         ).andExpect(status().isOk)
@@ -100,7 +100,7 @@ class SmsControllerTest(
 
     private fun upsertTemplate(eid: String, body: String, roles: List<String> = listOf("EVENT_ADMIN"), eventIds: List<String> = listOf(eid)) =
         mockMvc.perform(
-            put("/api/events/$eid/sms-template")
+            put("/events/$eid/sms-template")
                 .with(authenticatedAs(roles = roles, eventIds = eventIds))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(mapOf("body" to body))),
@@ -108,12 +108,12 @@ class SmsControllerTest(
 
     private fun getTemplate(eid: String, roles: List<String> = listOf("EVENT_ADMIN"), eventIds: List<String> = listOf(eid)) =
         mockMvc.perform(
-            get("/api/events/$eid/sms-template").with(authenticatedAs(roles = roles, eventIds = eventIds)),
+            get("/events/$eid/sms-template").with(authenticatedAs(roles = roles, eventIds = eventIds)),
         )
 
     private fun preview(eid: String, guestId: String) =
         mockMvc.perform(
-            post("/api/events/$eid/sms-template/preview")
+            post("/events/$eid/sms-template/preview")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(mapOf("guestId" to guestId))),
@@ -121,7 +121,7 @@ class SmsControllerTest(
 
     private fun gate(eid: String, excludeAlreadySent: Boolean = true, roles: List<String> = listOf("EVENT_ADMIN"), eventIds: List<String> = listOf(eid)) =
         mockMvc.perform(
-            post("/api/events/$eid/sms/send/gate")
+            post("/events/$eid/sms/send/gate")
                 .with(authenticatedAs(roles = roles, eventIds = eventIds))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(mapOf("excludeAlreadySent" to excludeAlreadySent))),
@@ -129,7 +129,7 @@ class SmsControllerTest(
 
     private fun send(eid: String, excludeAlreadySent: Boolean = true, confirm: Boolean, roles: List<String> = listOf("EVENT_ADMIN"), eventIds: List<String> = listOf(eid)) =
         mockMvc.perform(
-            post("/api/events/$eid/sms/send")
+            post("/events/$eid/sms/send")
                 .with(authenticatedAs(roles = roles, eventIds = eventIds))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(mapOf("excludeAlreadySent" to excludeAlreadySent, "confirm" to confirm))),
@@ -137,7 +137,7 @@ class SmsControllerTest(
 
     private fun resend(eid: String, guestId: String, confirm: Boolean) =
         mockMvc.perform(
-            post("/api/events/$eid/sms/resend")
+            post("/events/$eid/sms/resend")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(mapOf("guestId" to guestId, "confirm" to confirm))),
@@ -145,7 +145,7 @@ class SmsControllerTest(
 
     private fun listLog(eid: String, roles: List<String> = listOf("EVENT_ADMIN"), eventIds: List<String> = listOf(eid)) =
         mockMvc.perform(
-            get("/api/events/$eid/sms-log").with(authenticatedAs(roles = roles, eventIds = eventIds)),
+            get("/events/$eid/sms-log").with(authenticatedAs(roles = roles, eventIds = eventIds)),
         )
 
     private fun smsLogCount(eid: String): Int =
@@ -206,12 +206,12 @@ class SmsControllerTest(
 
         assertTrue(rendered1.contains("가그룹"), "gid1 결과에는 gid1 소속(가그룹)만 나와야 한다")
         assertFalse(rendered1.contains("나그룹"), "이름이 같아도 gid2 소속(나그룹)이 섞이면 안 된다")
-        assertTrue(rendered1.contains("http://localhost:3000/u/$token1"))
+        assertTrue(rendered1.contains("http://localhost:3000/app/u/$token1"))
         assertFalse(rendered1.contains(token2), "gid1 결과에 gid2 토큰이 섞이면 안 된다")
 
         assertTrue(rendered2.contains("나그룹"))
         assertFalse(rendered2.contains("가그룹"))
-        assertTrue(rendered2.contains("http://localhost:3000/u/$token2"))
+        assertTrue(rendered2.contains("http://localhost:3000/app/u/$token2"))
         assertFalse(rendered2.contains(token1))
     }
 
@@ -228,7 +228,7 @@ class SmsControllerTest(
             preview(eid, gid).andExpect(status().isOk).andReturn().response.getContentAsString(StandardCharsets.UTF_8),
         ).get("data").get("rendered").asText()
 
-        assertEquals("확인: http://localhost:3000/u/$token", rendered)
+        assertEquals("확인: http://localhost:3000/app/u/$token", rendered)
         assertFalse(rendered.contains("http://http://"), "이중 스킴이 발생하면 안 된다")
     }
 
@@ -469,7 +469,7 @@ class SmsControllerTest(
         send(eid, confirm = true).andExpect(status().isOk)
 
         mockMvc.perform(
-            delete("/api/events/$eid/guests/$gid")
+            delete("/events/$eid/guests/$gid")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         ).andExpect(status().isOk)
 

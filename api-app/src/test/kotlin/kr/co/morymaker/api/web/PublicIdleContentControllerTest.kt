@@ -40,7 +40,7 @@ class PublicIdleContentControllerTest(
 
     private fun createEvent(name: String = "공개 조회 테스트 행사"): String {
         val response = mockMvc.perform(
-            post("/api/events")
+            post("/events")
                 .with(authenticatedAs(roles = listOf("SYSTEM_ADMIN")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"name":"$name"}"""),
@@ -52,7 +52,7 @@ class PublicIdleContentControllerTest(
 
     private fun createContent(eid: String, name: String, sortOrder: Int) {
         mockMvc.perform(
-            post("/api/events/$eid/idle-contents")
+            post("/events/$eid/idle-contents")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(mapOf("name" to name, "kind" to "이미지", "sortOrder" to sortOrder))),
@@ -65,7 +65,7 @@ class PublicIdleContentControllerTest(
         createContent(eid, "두번째", 2)
         createContent(eid, "첫번째", 1)
 
-        mockMvc.perform(get("/api/public/events/$eid/idle-contents"))
+        mockMvc.perform(get("/public/events/$eid/idle-contents"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data[0].name").value("첫번째"))
             .andExpect(jsonPath("$.data[1].name").value("두번째"))
@@ -73,7 +73,7 @@ class PublicIdleContentControllerTest(
 
     @Test
     fun `존재하지 않는 eid도 404가 아니라 빈 배열을 반환한다(fail-open)`() {
-        mockMvc.perform(get("/api/public/events/존재하지-않는-id/idle-contents"))
+        mockMvc.perform(get("/public/events/존재하지-않는-id/idle-contents"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data").isArray)
             .andExpect(jsonPath("$.data.length()").value(0))
@@ -86,7 +86,7 @@ class PublicIdleContentControllerTest(
         createContent(eidA, "A행사 콘텐츠", 1)
         createContent(eidB, "B행사 콘텐츠", 1)
 
-        mockMvc.perform(get("/api/public/events/$eidA/idle-contents"))
+        mockMvc.perform(get("/public/events/$eidA/idle-contents"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.length()").value(1))
             .andExpect(jsonPath("$.data[0].name").value("A행사 콘텐츠"))

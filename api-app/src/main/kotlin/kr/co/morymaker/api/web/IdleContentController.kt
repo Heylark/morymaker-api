@@ -26,10 +26,10 @@ import org.springframework.web.bind.annotation.RestController
  *
  * `{eid}` 경로변수명은 고정 — `EventScopeInterceptor`가 "eid" 키만 검사한다(00-research 발견 3,
  * ParkingZoneController와 동일 원칙). 키오스크 무인증 조회는 `PublicIdleContentController`
- * (`/api/public/events/{eid}/idle-contents`)가 별도로 담당한다.
+ * (`/public/events/{eid}/idle-contents`)가 별도로 담당한다.
  */
 @RestController
-@RequestMapping("/api/events/{eid}/idle-contents")
+@RequestMapping("/events/{eid}/idle-contents")
 class IdleContentController(
     private val idleContentUseCase: IdleContentUseCase,
 ) {

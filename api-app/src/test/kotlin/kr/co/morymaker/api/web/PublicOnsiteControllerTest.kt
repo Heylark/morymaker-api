@@ -41,7 +41,7 @@ class PublicOnsiteControllerTest(
 
     private fun createEvent(name: String = "현장등록 테스트 행사"): String {
         val response = mockMvc.perform(
-            post("/api/events")
+            post("/events")
                 .with(authenticatedAs(roles = listOf("SYSTEM_ADMIN")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"name":"$name"}"""),
@@ -61,14 +61,14 @@ class PublicOnsiteControllerTest(
     fun `현장등록 폼은 인증 헤더 없이 행사 브랜딩만 반환한다`() {
         val eid = createEvent("브랜딩 테스트 행사")
 
-        mockMvc.perform(get("/api/public/r/$eid"))
+        mockMvc.perform(get("/public/r/$eid"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.event.name").value("브랜딩 테스트 행사"))
     }
 
     @Test
     fun `무효 eventCode는 404를 받는다`() {
-        mockMvc.perform(get("/api/public/r/no-such-event"))
+        mockMvc.perform(get("/public/r/no-such-event"))
             .andExpect(status().isNotFound)
             .andExpect(jsonPath("$.error.code").value("NOT_FOUND"))
     }
@@ -78,7 +78,7 @@ class PublicOnsiteControllerTest(
         val eid = createEvent()
         closeEvent(eid)
 
-        mockMvc.perform(get("/api/public/r/$eid"))
+        mockMvc.perform(get("/public/r/$eid"))
             .andExpect(status().isConflict)
             .andExpect(jsonPath("$.error.code").value("EVENT_CLOSED"))
     }
@@ -90,7 +90,7 @@ class PublicOnsiteControllerTest(
         val eid = createEvent()
 
         val response = mockMvc.perform(
-            post("/api/public/r/$eid")
+            post("/public/r/$eid")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"name":"홍길동","org":"○○사","phone":"010-1111-2222"}"""),
         )
@@ -103,7 +103,7 @@ class PublicOnsiteControllerTest(
 
         // 명단에도 반영됐는지 관리자 API로 확인 — src=현장, status=대기(즉시 체크인은 §5-1에서만).
         mockMvc.perform(
-            get("/api/events/$eid/guests")
+            get("/events/$eid/guests")
                 .with(authenticatedAs(roles = listOf("SYSTEM_ADMIN"))),
         )
             .andExpect(jsonPath("$.data[0].src").value("현장"))
@@ -116,7 +116,7 @@ class PublicOnsiteControllerTest(
         val eid = createEvent()
 
         mockMvc.perform(
-            post("/api/public/r/$eid")
+            post("/public/r/$eid")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"org":"이름없음"}"""),
         )
@@ -127,7 +127,7 @@ class PublicOnsiteControllerTest(
     @Test
     fun `무효 eventCode 현장등록은 404를 받는다`() {
         mockMvc.perform(
-            post("/api/public/r/no-such-event")
+            post("/public/r/no-such-event")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"name":"홍길동"}"""),
         )
@@ -140,7 +140,7 @@ class PublicOnsiteControllerTest(
         closeEvent(eid)
 
         mockMvc.perform(
-            post("/api/public/r/$eid")
+            post("/public/r/$eid")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"name":"홍길동"}"""),
         )

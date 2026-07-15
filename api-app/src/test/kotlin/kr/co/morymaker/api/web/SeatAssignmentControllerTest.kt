@@ -47,7 +47,7 @@ class SeatAssignmentControllerTest(
 
     private fun createEvent(name: String = "좌석 배정 테스트 행사"): String {
         val response = mockMvc.perform(
-            post("/api/events")
+            post("/events")
                 .with(authenticatedAs(roles = listOf("SYSTEM_ADMIN")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"name":"$name"}"""),
@@ -59,7 +59,7 @@ class SeatAssignmentControllerTest(
 
     private fun registerGuest(eid: String, name: String): String {
         val response = mockMvc.perform(
-            post("/api/events/$eid/guests")
+            post("/events/$eid/guests")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"name":"$name"}"""),
@@ -71,7 +71,7 @@ class SeatAssignmentControllerTest(
 
     private fun createGroup(eid: String, label: String, numbering: Boolean): Pair<String, Int> {
         val response = mockMvc.perform(
-            post("/api/events/$eid/seat-groups")
+            post("/events/$eid/seat-groups")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(mapOf("label" to label, "numbering" to numbering))),
@@ -84,7 +84,7 @@ class SeatAssignmentControllerTest(
 
     private fun replaceRaw(eid: String, groupNo: Int, assignments: List<Map<String, Any?>>, eventIds: List<String> = listOf(eid)) =
         mockMvc.perform(
-            put("/api/events/$eid/seat-assignments")
+            put("/events/$eid/seat-assignments")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = eventIds))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(mapOf("groupNo" to groupNo, "assignments" to assignments))),
@@ -160,7 +160,7 @@ class SeatAssignmentControllerTest(
         replaceRaw(eid, groupNo, guestIds.map { mapOf("ord" to 0, "guestId" to it) }).andExpect(status().isOk)
 
         mockMvc.perform(
-            get("/api/events/$eid/seat-assignments?groupNo=$groupNo&page=2&size=2")
+            get("/events/$eid/seat-assignments?groupNo=$groupNo&page=2&size=2")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         )
             .andExpect(status().isOk)
@@ -175,7 +175,7 @@ class SeatAssignmentControllerTest(
         val eid = createEvent()
 
         mockMvc.perform(
-            get("/api/events/$eid/seat-assignments?groupNo=999")
+            get("/events/$eid/seat-assignments?groupNo=999")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         )
             .andExpect(status().isNotFound)
@@ -235,7 +235,7 @@ class SeatAssignmentControllerTest(
         val g1 = registerGuest(eid, "박서연")
 
         mockMvc.perform(
-            put("/api/events/$eid/seat-assignments")
+            put("/events/$eid/seat-assignments")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"groupNo":$groupNo,"assignments":[{"ord":"가나다","guestId":"$g1"}]}"""),
@@ -251,7 +251,7 @@ class SeatAssignmentControllerTest(
         val g1 = registerGuest(eid, "박서연")
 
         mockMvc.perform(
-            put("/api/events/$eid/seat-assignments")
+            put("/events/$eid/seat-assignments")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"groupNo":$groupNo,"assignments":[{"ord":1.9,"guestId":"$g1"}]}"""),
@@ -283,7 +283,7 @@ class SeatAssignmentControllerTest(
         val (_, groupNo) = createGroup(eid, "A열", numbering = true)
 
         mockMvc.perform(
-            get("/api/events/$eid/seat-assignments?groupNo=$groupNo")
+            get("/events/$eid/seat-assignments?groupNo=$groupNo")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf("다른-행사-id"))),
         )
             .andExpect(status().isForbidden)
@@ -306,7 +306,7 @@ class SeatAssignmentControllerTest(
         val (_, groupNo) = createGroup(eid, "A열", numbering = true)
 
         mockMvc.perform(
-            get("/api/events/$eid/seat-assignments?groupNo=$groupNo")
+            get("/events/$eid/seat-assignments?groupNo=$groupNo")
                 .with(authenticatedAs(roles = listOf("EVENT_STAFF"), eventIds = listOf(eid))),
         )
             .andExpect(status().isForbidden)

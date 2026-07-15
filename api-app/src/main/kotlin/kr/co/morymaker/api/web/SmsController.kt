@@ -35,7 +35,7 @@ import org.springframework.web.bind.annotation.RestController
  * 전달한다 — `PublicHubController`가 동일하게 `PublicProperties`를 주입·소비하는 선례와 정합.
  */
 @RestController
-@RequestMapping("/api/events/{eid}")
+@RequestMapping("/events/{eid}")
 class SmsController(
     private val smsUseCase: SmsUseCase,
     private val props: PublicProperties,

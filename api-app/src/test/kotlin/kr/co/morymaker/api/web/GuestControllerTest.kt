@@ -47,7 +47,7 @@ class GuestControllerTest(
 
     private fun createEvent(name: String = "명단 테스트 행사"): String {
         val response = mockMvc.perform(
-            post("/api/events")
+            post("/events")
                 .with(authenticatedAs(roles = listOf("SYSTEM_ADMIN")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"name":"$name"}"""),
@@ -60,7 +60,7 @@ class GuestControllerTest(
     private fun registerGuest(eid: String, name: String, phone: String? = null): String {
         val body = objectMapper.writeValueAsString(mapOf("name" to name, "phone" to phone))
         val response = mockMvc.perform(
-            post("/api/events/$eid/guests")
+            post("/events/$eid/guests")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body),
@@ -77,7 +77,7 @@ class GuestControllerTest(
         val eid = createEvent()
 
         mockMvc.perform(
-            get("/api/events/$eid/guests")
+            get("/events/$eid/guests")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf("다른-행사-id"))),
         )
             .andExpect(status().isForbidden)
@@ -89,14 +89,14 @@ class GuestControllerTest(
         val eid = createEvent()
 
         mockMvc.perform(
-            post("/api/events/$eid/guests")
+            post("/events/$eid/guests")
                 .with(authenticatedAs(roles = listOf("SYSTEM_ADMIN")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"name":"시스템관리자 등록"}"""),
         ).andExpect(status().isCreated)
 
         mockMvc.perform(
-            get("/api/events/$eid/guests").with(authenticatedAs(roles = listOf("SYSTEM_ADMIN"))),
+            get("/events/$eid/guests").with(authenticatedAs(roles = listOf("SYSTEM_ADMIN"))),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.length()").value(1))
@@ -107,7 +107,7 @@ class GuestControllerTest(
         val eid = createEvent()
 
         mockMvc.perform(
-            get("/api/events/$eid/guests").with(authenticatedAs(roles = listOf("EVENT_ADMIN"))),
+            get("/events/$eid/guests").with(authenticatedAs(roles = listOf("EVENT_ADMIN"))),
         )
             .andExpect(status().isForbidden)
             .andExpect(jsonPath("$.error.code").value("EVENT_FORBIDDEN"))
@@ -118,7 +118,7 @@ class GuestControllerTest(
         val eid = createEvent()
 
         mockMvc.perform(
-            post("/api/events/$eid/guests")
+            post("/events/$eid/guests")
                 .with(authenticatedAs(roles = listOf("EVENT_STAFF"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"name":"실행자 시도"}"""),
@@ -135,7 +135,7 @@ class GuestControllerTest(
         registerGuest(eid, "김진우")
 
         mockMvc.perform(
-            get("/api/events/$eid/guests").with(authenticatedAs(roles = listOf("SYSTEM_ADMIN"))),
+            get("/events/$eid/guests").with(authenticatedAs(roles = listOf("SYSTEM_ADMIN"))),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.meta.total").value(1))
@@ -147,7 +147,7 @@ class GuestControllerTest(
         val eid = createEvent("meta 회귀 확인용")
 
         mockMvc.perform(
-            get("/api/events/$eid").with(authenticatedAs(roles = listOf("SYSTEM_ADMIN"))),
+            get("/events/$eid").with(authenticatedAs(roles = listOf("SYSTEM_ADMIN"))),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.meta").doesNotExist())
@@ -161,7 +161,7 @@ class GuestControllerTest(
         val gid = registerGuest(eid, "박서연", phone = "010-1111-2222")
 
         mockMvc.perform(
-            put("/api/events/$eid/guests/$gid")
+            put("/events/$eid/guests/$gid")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"org":"새소속"}"""),
@@ -178,19 +178,19 @@ class GuestControllerTest(
         val gid = registerGuest(eid, "이도현")
 
         mockMvc.perform(
-            delete("/api/events/$eid/guests/$gid")
+            delete("/events/$eid/guests/$gid")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.status").value("취소"))
 
         mockMvc.perform(
-            get("/api/events/$eid/guests").with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
+            get("/events/$eid/guests").with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         )
             .andExpect(jsonPath("$.data.length()").value(0))
 
         mockMvc.perform(
-            get("/api/events/$eid/guests?includeCancelled=true")
+            get("/events/$eid/guests?includeCancelled=true")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         )
             .andExpect(jsonPath("$.data.length()").value(1))
@@ -205,7 +205,7 @@ class GuestControllerTest(
         registerGuest(eid, "김진우")
 
         mockMvc.perform(
-            get("/api/events/$eid/guests?q=없는이름")
+            get("/events/$eid/guests?q=없는이름")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         )
             .andExpect(jsonPath("$.meta.searchState").value("NONE"))
@@ -219,7 +219,7 @@ class GuestControllerTest(
         registerGuest(eid, "박서연")
 
         mockMvc.perform(
-            get("/api/events/$eid/guests?q=김진우")
+            get("/events/$eid/guests?q=김진우")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         )
             .andExpect(jsonPath("$.meta.searchState").value("ONE"))
@@ -233,7 +233,7 @@ class GuestControllerTest(
         registerGuest(eid, "김진호")
 
         mockMvc.perform(
-            get("/api/events/$eid/guests?q=김진")
+            get("/events/$eid/guests?q=김진")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         )
             .andExpect(jsonPath("$.meta.searchState").value("MANY"))
@@ -245,12 +245,12 @@ class GuestControllerTest(
         val eid = createEvent()
         val gid = registerGuest(eid, "정하은")
         mockMvc.perform(
-            delete("/api/events/$eid/guests/$gid")
+            delete("/events/$eid/guests/$gid")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         ).andExpect(status().isOk)
 
         mockMvc.perform(
-            get("/api/events/$eid/guests?q=정하은")
+            get("/events/$eid/guests?q=정하은")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         )
             .andExpect(jsonPath("$.meta.searchState").value("NONE"))
@@ -263,7 +263,7 @@ class GuestControllerTest(
         val eid = createEvent()
         val gid = registerGuest(eid, "김아름")
         val groupResponse = mockMvc.perform(
-            post("/api/events/$eid/seat-groups")
+            post("/events/$eid/seat-groups")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"label":"A열","numbering":true}"""),
@@ -273,7 +273,7 @@ class GuestControllerTest(
         // numbering ON 그룹의 §12-5 PUT은 그룹 전체 슬롯 세트를 원자 교체한다 — ord는 1..N 연속·
         // 유일해야 하므로 목표 ord(3번)까지의 빈좌석(1·2번)도 함께 제출해야 한다.
         mockMvc.perform(
-            put("/api/events/$eid/seat-assignments")
+            put("/events/$eid/seat-assignments")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
@@ -284,7 +284,7 @@ class GuestControllerTest(
         ).andExpect(status().isOk)
 
         mockMvc.perform(
-            get("/api/events/$eid/guests?q=김아름")
+            get("/events/$eid/guests?q=김아름")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         )
             .andExpect(status().isOk)
@@ -297,7 +297,7 @@ class GuestControllerTest(
         registerGuest(eid, "미배정참석자")
 
         mockMvc.perform(
-            get("/api/events/$eid/guests?q=미배정참석자")
+            get("/events/$eid/guests?q=미배정참석자")
                 .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
         )
             .andExpect(status().isOk)
