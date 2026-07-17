@@ -25,11 +25,18 @@ class ProdUrlConfigGuardTest {
     }
 
     @Test
-    fun `세 값 전부 https면 통과`() {
+    fun `media-base-url이 http로 시작하면 기동 실패`() {
+        val guard = guardWith(mediaBaseUrl = "http://localhost:30100/api")
+        assertFailsWith<IllegalStateException> { guard.validate() }
+    }
+
+    @Test
+    fun `네 값 전부 https면 통과`() {
         val guard = guardWith(
             eventBaseUrl = "https://xxx.service.com/app",
             qrBaseUrl = "https://xxx.service.com/app",
             parkScanUrl = "https://xxx.service.com/app/p",
+            mediaBaseUrl = "https://xxx.service.com/api",
         )
         guard.validate()
     }
@@ -38,11 +45,13 @@ class ProdUrlConfigGuardTest {
         eventBaseUrl: String = "https://xxx.service.com/app",
         qrBaseUrl: String = "https://xxx.service.com/app",
         parkScanUrl: String = "https://xxx.service.com/app/p",
+        mediaBaseUrl: String = "https://xxx.service.com/api",
     ): ProdUrlConfigGuard {
         val guard = ProdUrlConfigGuard()
         ReflectionTestUtils.setField(guard, "eventBaseUrl", eventBaseUrl)
         ReflectionTestUtils.setField(guard, "qrBaseUrl", qrBaseUrl)
         ReflectionTestUtils.setField(guard, "parkScanUrl", parkScanUrl)
+        ReflectionTestUtils.setField(guard, "mediaBaseUrl", mediaBaseUrl)
         return guard
     }
 }

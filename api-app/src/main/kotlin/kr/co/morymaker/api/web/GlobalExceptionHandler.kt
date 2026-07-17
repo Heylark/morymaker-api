@@ -9,14 +9,18 @@ import kr.co.morymaker.api.application.service.EventNotOpenException
 import kr.co.morymaker.api.application.service.SmsSendBlockedException
 import kr.co.morymaker.api.dto.ErrorBody
 import kr.co.morymaker.api.dto.ErrorDetail
+import kr.co.morymaker.api.storage.MediaTooLargeException
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.http.converter.HttpMessageNotReadableException
 import org.springframework.security.access.AccessDeniedException
+import org.springframework.web.HttpMediaTypeNotSupportedException
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
+import org.springframework.web.multipart.MaxUploadSizeExceededException
+import org.springframework.web.multipart.support.MissingServletRequestPartException
 import org.springframework.web.servlet.NoHandlerFoundException
 import org.springframework.web.servlet.resource.NoResourceFoundException
 
@@ -114,6 +118,35 @@ class GlobalExceptionHandler {
     fun handleRateLimitExceeded(e: RateLimitExceededException): ResponseEntity<ErrorBody> =
         ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
             .body(ErrorBody(ErrorDetail("RATE_LIMIT_EXCEEDED", e.message ?: "요청이 너무 많습니다")))
+
+    // 대기화면 미디어 업로드(§11-3) 컨테이너 상한(영상 200MB) 초과. MultipartException의 하위
+    // 타입이지만 이 타입만 좁게 잡는다 — MultipartException 광역 catch는 이 413 매핑을
+    // 가로챌 수 있다(SlotOccupiedException 주석과 동일 원칙, DataIntegrityViolationException
+    // 광역 catch 회피 정신).
+    @ExceptionHandler(MaxUploadSizeExceededException::class)
+    fun handleMaxUploadSizeExceeded(e: MaxUploadSizeExceededException): ResponseEntity<ErrorBody> =
+        ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+            .body(ErrorBody(ErrorDetail("FILE_TOO_LARGE", "파일 용량이 너무 큽니다")))
+
+    // 앱 정책 상한(이미지 20MB) 초과 — 컨테이너 초과와 같은 코드로 통일한다(클라이언트에겐
+    // 둘 다 "파일이 큼").
+    @ExceptionHandler(MediaTooLargeException::class)
+    fun handleMediaTooLarge(e: MediaTooLargeException): ResponseEntity<ErrorBody> =
+        ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+            .body(ErrorBody(ErrorDetail("FILE_TOO_LARGE", e.message ?: "파일 용량이 너무 큽니다")))
+
+    // 대기화면 미디어 등록(§11-3, M3) file 파트 누락 — file 없는 콘텐츠 등록을 구조적으로
+    // 불가능하게 만드는 것이 이 계약 전환의 근본 취지다.
+    @ExceptionHandler(MissingServletRequestPartException::class)
+    fun handleMissingFilePart(e: MissingServletRequestPartException): ResponseEntity<ErrorBody> =
+        ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            .body(ErrorBody(ErrorDetail("MISSING_FILE_PART", "파일을 첨부해 주세요")))
+
+    // 대기화면 미디어 등록(§11-3) 구 JSON 클라이언트가 multipart 전환 후에도 그대로 요청하는 경우.
+    @ExceptionHandler(HttpMediaTypeNotSupportedException::class)
+    fun handleUnsupportedMediaType(e: HttpMediaTypeNotSupportedException): ResponseEntity<ErrorBody> =
+        ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+            .body(ErrorBody(ErrorDetail("UNSUPPORTED_MEDIA_TYPE", "요청 형식을 확인해 주세요")))
 
     // 이 핸들러는 "요청이 잘못됐다"만 받는다. @Valid로 표현할 수 없는 요청 형태 검증(예: 두 필드 중
     // 최소 하나 필수 — CheckinRequest의 token/guestId)은 컨트롤러가 직접 이 예외를 던지고, 서비스
