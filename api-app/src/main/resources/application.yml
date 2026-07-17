@@ -58,3 +58,14 @@ morymaker:
       # 현장등록 POST 전용 인메모리 고정윈도(IP 키) — 공용 데스크 태블릿 오탐 완화 위해 넉넉히.
       limit: ${PUBLIC_RATE_LIMIT:20}
       window-seconds: ${PUBLIC_RATE_LIMIT_WINDOW_SECONDS:60}
+  sms:
+    # 실 채널 어댑터(벤더 확정 후 별도 REQ) 도입 시 사용할 설정 키 자리 — 현재는 무-네트워크
+    # 스텁(SmsSenderStubAdapter)만 존재해 아래 값이 어디에도 소비되지 않는다. 벤더 계약 후
+    # SmsSenderProdGuard가 prod 기동을 통과하려면 SmsSenderPort의 새 구현체가 이 값들을 읽어야
+    # 한다. .env.example이 아직 없어(별도 트랙 진행 중) 실값 오버라이드 없이 주석으로만 자리를
+    # 확정한다 — 벤더별 SDK가 요구하는 자격증명 형태가 달라 정확한 키 이름·개수는 벤더 확정 후
+    # 조정될 수 있다.
+    # vendor: (확정 벤더명 — 후보 비교 검토 후 결정)
+    # sender-number: (사전등록된 발신번호, 변경 시 벤더사 재등록 리드타임 발생)
+    # api-key: ${SMS_API_KEY:}
+    # api-secret: ${SMS_API_SECRET:}
