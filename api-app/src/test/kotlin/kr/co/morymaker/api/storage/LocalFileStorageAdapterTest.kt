@@ -4,6 +4,7 @@ import kr.co.morymaker.api.application.port.out.StoreFileCommand
 import kr.co.morymaker.api.config.MediaProperties
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.io.IOException
 import java.io.InputStream
 import java.nio.file.Files
@@ -12,6 +13,7 @@ import java.util.UUID
 import kotlin.io.path.listDirectoryEntries
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -216,5 +218,99 @@ class LocalFileStorageAdapterTest {
         adapter(tempDir).store(command(eventId = eventId))
 
         assertTempDirEmpty(tempDir)
+    }
+
+    // ── delete — 트랜잭션 동기화 비활성(트랜잭션 밖, 배치·테스트) ──────────
+
+    @Test
+    fun `delete는 트랜잭션 동기화가 비활성이면(트랜잭션 밖) 즉시 파일을 삭제한다`(@TempDir tempDir: Path) {
+        val eventId = UUID.randomUUID().toString()
+        val contentId = UUID.randomUUID().toString()
+        val a = adapter(tempDir)
+        a.store(command(eventId = eventId, contentId = contentId))
+        val target = tempDir.resolve(eventId).resolve(contentId)
+        assertTrue(Files.exists(target))
+
+        a.delete(eventId, "$eventId/$contentId")
+
+        assertFalse(Files.exists(target))
+    }
+
+    @Test
+    fun `delete는 파일이 존재하지 않아도 예외 없이 idempotent하게 종료한다`(@TempDir tempDir: Path) {
+        val eventId = UUID.randomUUID().toString()
+
+        adapter(tempDir).delete(eventId, "$eventId/${UUID.randomUUID()}")
+        // 예외 없이 반환되면 idempotent 계약 충족.
+    }
+
+    @Test
+    fun `delete는 storageKey가 eventId 접두와 불일치하면 파일을 건드리지 않는다(cross-event 방어심층)`(@TempDir tempDir: Path) {
+        val eventId = UUID.randomUUID().toString()
+        val contentId = UUID.randomUUID().toString()
+        val a = adapter(tempDir)
+        a.store(command(eventId = eventId, contentId = contentId))
+        val target = tempDir.resolve(eventId).resolve(contentId)
+
+        a.delete("다른-행사-id", "$eventId/$contentId")
+
+        assertTrue(Files.exists(target), "타 행사 eventId로 삭제 시도해도 실제 파일은 남아 있어야 한다")
+    }
+
+    @Test
+    fun `delete는 storageKey가 traversal 페이로드를 포함하면 root 밖 파일을 삭제하지 못한다`(@TempDir base: Path) {
+        val root = base.resolve("media")
+        Files.createDirectories(root)
+        val outsideFile = base.resolve("secret.txt")
+        Files.writeString(outsideFile, "root 밖 파일")
+        val eventId = UUID.randomUUID().toString()
+
+        LocalFileStorageAdapter(MediaProperties(root = root.toString()))
+            .delete(eventId, "$eventId/../../secret.txt")
+
+        assertTrue(Files.exists(outsideFile), "경로 봉인이 뚫려 root 밖 실재 파일을 삭제했다")
+    }
+
+    // ── delete — 트랜잭션 동기화 활성(afterCommit 경계) ────────────────────
+
+    @Test
+    fun `delete는 트랜잭션 커밋이 확정된 후에만(afterCommit) 물리 파일을 삭제한다`(@TempDir tempDir: Path) {
+        val eventId = UUID.randomUUID().toString()
+        val contentId = UUID.randomUUID().toString()
+        val a = adapter(tempDir)
+        a.store(command(eventId = eventId, contentId = contentId))
+        val target = tempDir.resolve(eventId).resolve(contentId)
+
+        TransactionSynchronizationManager.initSynchronization()
+        try {
+            a.delete(eventId, "$eventId/$contentId")
+            assertTrue(Files.exists(target), "afterCommit 이전에는 파일이 삭제되면 안 된다")
+
+            TransactionSynchronizationManager.getSynchronizations().forEach { it.afterCommit() }
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization()
+        }
+
+        assertFalse(Files.exists(target), "afterCommit 이후에는 파일이 삭제돼야 한다")
+    }
+
+    @Test
+    fun `delete는 afterCommit이 호출되지 않으면(트랜잭션 롤백 동등) 물리 파일을 삭제하지 않는다`(@TempDir tempDir: Path) {
+        val eventId = UUID.randomUUID().toString()
+        val contentId = UUID.randomUUID().toString()
+        val a = adapter(tempDir)
+        a.store(command(eventId = eventId, contentId = contentId))
+        val target = tempDir.resolve(eventId).resolve(contentId)
+
+        TransactionSynchronizationManager.initSynchronization()
+        try {
+            a.delete(eventId, "$eventId/$contentId")
+            // 롤백 시나리오 — afterCommit을 호출하지 않고 그대로 종료한다(실 트랜잭션의
+            // afterCompletion(ROLLBACK)만 발생하는 경로와 동등).
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization()
+        }
+
+        assertTrue(Files.exists(target), "afterCommit이 호출되지 않았으면 파일이 남아 있어야 한다")
     }
 }

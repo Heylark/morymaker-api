@@ -97,4 +97,10 @@
            AND event_id = #{eventId}
     </update>
 
+    <delete id="delete">
+        DELETE FROM idle_content
+         WHERE id = #{id}
+           AND event_id = #{eventId}
+    </delete>
+
 </mapper>

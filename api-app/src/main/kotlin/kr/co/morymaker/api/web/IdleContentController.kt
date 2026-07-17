@@ -7,6 +7,7 @@ import kr.co.morymaker.api.application.port.`in`.IdleContentUseCase
 import kr.co.morymaker.api.domain.security.MoryRoles
 import kr.co.morymaker.api.dto.ApiResponse
 import kr.co.morymaker.api.dto.IdleContentCreateRequest
+import kr.co.morymaker.api.dto.IdleContentDeleteResponse
 import kr.co.morymaker.api.dto.IdleContentResponse
 import kr.co.morymaker.api.dto.IdleContentUpdateRequest
 import kr.co.morymaker.api.dto.toResponse
@@ -14,6 +15,7 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.security.access.prepost.PreAuthorize
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.ModelAttribute
 import org.springframework.web.bind.annotation.PathVariable
@@ -86,5 +88,12 @@ class IdleContentController(
             sortOrder = request.sortOrder,
         )
         return ApiResponse(idleContentUseCase.update(eid, cid, command).toResponse(mediaBaseUrl))
+    }
+
+    @DeleteMapping("/{cid}")
+    @PreAuthorize(MoryRoles.HAS_ADMIN_CONSOLE)
+    fun delete(@PathVariable eid: String, @PathVariable cid: String): ApiResponse<IdleContentDeleteResponse> {
+        idleContentUseCase.delete(eid, cid)
+        return ApiResponse(IdleContentDeleteResponse(cid))
     }
 }

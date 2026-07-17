@@ -111,6 +111,45 @@ class IdleContentServiceTest {
         assertFailsWith<NoSuchElementException> { service.update("ev1", "ghost", command) }
     }
 
+    // ── delete(§11-4) ──────────────────────────────────────────────
+
+    @Test
+    fun `delete는 DB 메타를 삭제한 뒤 fileUrl이 있으면 FileStoragePort delete를 호출한다`() {
+        every { eventScopeGuard.assertAccess("ev1") } returns Unit
+        every { idleContentPort.fetchById("ev1", "c1") } returns
+            sampleContent(id = "c1", fileUrl = "ev1/c1", fileContentType = "image/png")
+        every { idleContentPort.delete("ev1", "c1") } returns Unit
+        every { fileStoragePort.delete("ev1", "ev1/c1") } returns Unit
+
+        service.delete("ev1", "c1")
+
+        verify(exactly = 1) { idleContentPort.delete("ev1", "c1") }
+        verify(exactly = 1) { fileStoragePort.delete("ev1", "ev1/c1") }
+    }
+
+    @Test
+    fun `delete는 fileUrl이 없으면(구 메타 전용 행) FileStoragePort delete를 호출하지 않는다`() {
+        every { eventScopeGuard.assertAccess("ev1") } returns Unit
+        every { idleContentPort.fetchById("ev1", "c1") } returns sampleContent(id = "c1", fileUrl = null)
+        every { idleContentPort.delete("ev1", "c1") } returns Unit
+
+        service.delete("ev1", "c1")
+
+        verify(exactly = 1) { idleContentPort.delete("ev1", "c1") }
+        verify(exactly = 0) { fileStoragePort.delete(any(), any()) }
+    }
+
+    @Test
+    fun `delete는 콘텐츠가 없으면(타 행사 cid 포함) NoSuchElementException을 던지고 DB delete를 호출하지 않는다`() {
+        every { eventScopeGuard.assertAccess("ev1") } returns Unit
+        every { idleContentPort.fetchById("ev1", "ghost") } returns null
+
+        assertFailsWith<NoSuchElementException> { service.delete("ev1", "ghost") }
+
+        verify(exactly = 0) { idleContentPort.delete(any(), any()) }
+        verify(exactly = 0) { fileStoragePort.delete(any(), any()) }
+    }
+
     // ── listForKiosk(§11-2, M3 — 무인증) ────────────────────────────
 
     @Test

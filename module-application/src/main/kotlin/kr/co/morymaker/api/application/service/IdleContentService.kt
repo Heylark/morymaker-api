@@ -81,6 +81,19 @@ internal class IdleContentService(
         return merged.toView()
     }
 
+    // DB 메타 삭제(트랜잭션 내 커밋 확정) → 물리 파일 회수 순서 — fileStoragePort.delete가
+    // afterCommit에 실제 I/O를 미뤄 orphan(파일-메타 불일치)을 방지한다(create의 store 호출과
+    // 대칭). fileUrl == null(구 메타 전용 행)이면 파일 삭제 호출 자체를 스킵 — 부재 파일 접근이
+    // 없으므로 idempotent가 이 계층에서 자연히 충족된다.
+    @Transactional
+    override fun delete(eventId: String, cid: String) {
+        eventScopeGuard.assertAccess(eventId)
+        val existing = idleContentPort.fetchById(eventId, cid)
+            ?: throw NoSuchElementException("대기화면 콘텐츠를 찾을 수 없습니다")
+        idleContentPort.delete(eventId, cid)
+        existing.fileUrl?.let { fileStoragePort.delete(eventId, it) }
+    }
+
     // 키오스크 공개 조회(§11-2, M3) — assertAccess 없음(무인증 설계). 존재하지 않는
     // eventId는 findByEvent가 자연히 빈 리스트를 반환한다(fail-open, 404 아님).
     @Transactional(readOnly = true)

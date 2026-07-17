@@ -18,6 +18,12 @@ interface FileStoragePort {
 
     /** 저장된 파일의 물리 경로. 소속 행사 불일치·경로 이탈·파일 부재는 전부 null. */
     fun resolve(eventId: String, storageKey: String): Path?
+
+    /**
+     * 물리 파일 삭제(idempotent) — 부재는 정상 경로(구 메타 전용 행 재삭제 등)이므로 오류가 아니다.
+     * 트랜잭션 동기화가 활성 상태면 커밋 확정 후(afterCommit)에만 실제 삭제가 수행된다.
+     */
+    fun delete(eventId: String, storageKey: String)
 }
 
 /** [FileStoragePort.store] 입력. */

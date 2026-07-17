@@ -20,6 +20,9 @@ interface IdleContentUseCase {
 
     /** 수정(§11-4) — mode/play/sortOrder만 갱신, name/kind/fileUrl은 불변. */
     fun update(eventId: String, cid: String, command: IdleContentUpdateCommand): IdleContentView
+
+    /** 삭제(§11-4) — DB 메타 삭제 확정 후 물리 파일을 회수한다(구 메타 전용 행은 파일 삭제 스킵). */
+    fun delete(eventId: String, cid: String)
 }
 
 /**

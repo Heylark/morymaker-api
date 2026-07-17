@@ -18,4 +18,7 @@ interface IdleContentPort {
 
     /** 수정(§11-4) — mode/play/sort_order만 갱신. */
     fun update(content: IdleContent)
+
+    /** 삭제(§11-4) — event_id 스코프 봉인(cross-event 방어심층). */
+    fun delete(eventId: String, id: String)
 }
