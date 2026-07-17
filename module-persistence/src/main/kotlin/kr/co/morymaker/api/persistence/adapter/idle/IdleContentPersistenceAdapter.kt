@@ -24,4 +24,6 @@ internal class IdleContentPersistenceAdapter(
     override fun insert(content: IdleContent) = idleContentMapper.insert(content)
 
     override fun update(content: IdleContent) = idleContentMapper.update(content)
+
+    override fun delete(eventId: String, id: String) = idleContentMapper.delete(eventId, id)
 }

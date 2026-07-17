@@ -24,4 +24,7 @@ interface IdleContentMapper {
     fun insert(content: IdleContent)
 
     fun update(content: IdleContent)
+
+    /** 삭제(§11-4) — event_id 스코프 봉인(cross-event 방어심층). */
+    fun delete(@Param("eventId") eventId: String, @Param("id") id: String)
 }
