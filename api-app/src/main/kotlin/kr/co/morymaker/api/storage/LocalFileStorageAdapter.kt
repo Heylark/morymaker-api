@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import org.springframework.transaction.support.TransactionSynchronization
 import org.springframework.transaction.support.TransactionSynchronizationManager
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
@@ -75,10 +76,7 @@ internal class LocalFileStorageAdapter(
     // DB의 storageKey도 신뢰하지 않는다 — eventId 접두 대조 + normalize 봉인을 여기서도 다시 적용한다
     // (cross-event 방어심층, CLAUDE.md "cross-event 방어심층 — 읽기 확장" 정합).
     override fun resolve(eventId: String, storageKey: String): Path? {
-        if (!storageKey.startsWith("$eventId/")) return null
-        val root = this.root
-        val candidate = root.resolve(storageKey).normalize()
-        if (!candidate.startsWith(root)) return null
+        val candidate = sealPath(eventId, storageKey) ?: return null
         if (!Files.isRegularFile(candidate)) {
             // 저장 루트 볼륨 미마운트 또는 파일 유실이 유일한 도달 경로 — "업로드 200인데 화면엔
             // 안 나옴"이라는 증상이 이 REQ가 고치려는 것과 구분 불가하므로 진단 로그가 유일한 단서다.
@@ -86,6 +84,45 @@ internal class LocalFileStorageAdapter(
             return null
         }
         return candidate
+    }
+
+    // 삭제는 부재(idempotent 재실행·구 메타 전용 행)가 정상 경로다 — resolve()의 ERROR 로그를
+    // 그대로 재사용하면 정상 삭제마다 오탐 진단 로그가 쌓여 진짜 서빙 이상 신호가 묻힌다.
+    // 트랜잭션 동기화가 활성 상태면 DB 메타 삭제가 커밋 확정된 뒤(afterCommit)에만 물리 파일을
+    // 지운다 — 파일을 먼저 지우면 메타 삭제가 롤백됐을 때 "파일 없는데 메타 있음"(dangling
+    // 메타)이 발생하기 때문이다. 트랜잭션 밖(배치·테스트)에서는 기다릴 커밋이 없으므로 즉시 삭제.
+    override fun delete(eventId: String, storageKey: String) {
+        val target = sealPath(eventId, storageKey) ?: return
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(
+                object : TransactionSynchronization {
+                    override fun afterCommit() {
+                        deleteQuietly(target)
+                    }
+                },
+            )
+        } else {
+            deleteQuietly(target)
+        }
+    }
+
+    // resolve()·delete() 공통 경로 봉인(cross-event 접두 대조 + normalize + root 포함 검사) —
+    // 파일 존재 검사·ERROR 로그는 포함하지 않는다(순수 경로 판정만, resolve 전용 진단은 호출부가 담당).
+    private fun sealPath(eventId: String, storageKey: String): Path? {
+        if (!storageKey.startsWith("$eventId/")) return null
+        val root = this.root
+        val candidate = root.resolve(storageKey).normalize()
+        return if (candidate.startsWith(root)) candidate else null
+    }
+
+    private fun deleteQuietly(target: Path) {
+        try {
+            Files.deleteIfExists(target) // idempotent — 부재는 정상 경로(로그 없음)
+        } catch (e: IOException) {
+            // 메타는 이미 커밋 확정 — 파일 삭제 실패로 DB를 되돌리지 않는다(orphan 파일 < dangling 메타).
+            // 재실행 가능한 디스크 잔여이므로 WARN(오류 아님)으로 남기고 삼킨다.
+            log.warn("미디어 물리 삭제 실패(메타는 삭제 확정 완료) target={}", target, e)
+        }
     }
 
     private fun resolveTarget(root: Path, eventId: String, contentId: String): Path {
