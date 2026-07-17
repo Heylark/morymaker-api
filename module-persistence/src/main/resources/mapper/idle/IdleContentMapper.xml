@@ -5,7 +5,7 @@
     IdleContentMapper.xml — idle_content 테이블(1테이블1파일, §11-2~4 신설).
 
     <constructor> 선언 순서는 IdleContent 주 생성자 파라미터 순서와 정확히 일치해야 한다:
-    (id, eventId, name, kind, mode, play, fileUrl, sortOrder).
+    (id, eventId, name, kind, mode, play, fileUrl, fileContentType, sortOrder).
     positional index(번호로 컬럼을 꺼내는 방식) 금지 — 컬럼명 기반 명시 매핑(EventMapper·
     ParkingZoneMapper와 동일 원칙).
 
@@ -14,6 +14,9 @@
     별칭 표에서 "int"는 래퍼 타입(java.lang.Integer)에 매핑되고 프리미티브는 "_int" 접두사
     별칭이 맡는다(ParkingZoneMapper.xml start_no/slot_count와 동일 원인).
 
+    file_content_type(V4 신설) — 대기화면 미디어 실 저장 도입(REQ-0030-01)으로 추가. fileUrl과
+    생멸을 같이한다(구 메타 전용 행은 둘 다 NULL, 신규 행은 둘 다 non-null).
+
     createdAt 없음 — V1__init.sql idle_content 테이블에 해당 컬럼 자체가 없다(IdleContent
     도메인도 무보유, Instant 핸들러 무관).
 -->
@@ -21,14 +24,15 @@
 
     <resultMap id="BaseResultMap" type="kr.co.morymaker.api.domain.idle.IdleContent">
         <constructor>
-            <idArg column="id"         javaType="String"/>
-            <arg   column="event_id"   javaType="String"/>
-            <arg   column="name"       javaType="String"/>
-            <arg   column="kind"       javaType="String"/>
-            <arg   column="mode"       javaType="String"/>
-            <arg   column="play"       javaType="String"/>
-            <arg   column="file_url"   javaType="String"/>
-            <arg   column="sort_order" javaType="_int"/>
+            <idArg column="id"                javaType="String"/>
+            <arg   column="event_id"          javaType="String"/>
+            <arg   column="name"              javaType="String"/>
+            <arg   column="kind"              javaType="String"/>
+            <arg   column="mode"              javaType="String"/>
+            <arg   column="play"              javaType="String"/>
+            <arg   column="file_url"          javaType="String"/>
+            <arg   column="file_content_type" javaType="String"/>
+            <arg   column="sort_order"        javaType="_int"/>
         </constructor>
     </resultMap>
 
@@ -40,6 +44,7 @@
         , mode
         , play
         , file_url
+        , file_content_type
         , sort_order
     </sql>
 
@@ -68,6 +73,7 @@
             , mode
             , play
             , file_url
+            , file_content_type
             , sort_order
         ) VALUES (
             #{id}
@@ -77,6 +83,7 @@
             , #{mode}
             , #{play}
             , #{fileUrl}
+            , #{fileContentType}
             , #{sortOrder}
         )
     </insert>
