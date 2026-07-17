@@ -25,6 +25,15 @@ spring:
     # 다른 서비스 테이블일 뿐 이 서비스의 첫 마이그레이션 자체를 건너뛰면 안 됨).
     baseline-on-migrate: true
     baseline-version: 0
+  servlet:
+    multipart:
+      # 영상 200MB 상한(CP-2 확정) — 이미지 20MB는 앱이 kind 판별 후 별도 분기 검증한다(단일
+      # 컨테이너 상한으로는 두 값을 동시에 표현할 수 없다).
+      max-file-size: 200MB
+      max-request-size: 210MB
+      # Boot 기본값과 동일 — 디스크 스풀 의도를 명시 박제한다. 0 초과 값은 그만큼 메모리
+      # 버퍼링을 켜 "서빙·저장 전체 로드 금지" 확정 제약을 스스로 위반한다.
+      file-size-threshold: 0B
 
 mybatis:
   mapper-locations: classpath*:mapper/**/*.xml
@@ -58,3 +67,11 @@ morymaker:
       # 현장등록 POST 전용 인메모리 고정윈도(IP 키) — 공용 데스크 태블릿 오탐 완화 위해 넉넉히.
       limit: ${PUBLIC_RATE_LIMIT:20}
       window-seconds: ${PUBLIC_RATE_LIMIT_WINDOW_SECONDS:60}
+  media:
+    # 대기화면 미디어 저장 루트(repo 상대 기본값 — 개발자 머신 root 권한·재부팅 소실 문제 회피).
+    root: ${MEDIA_ROOT:./var/media}
+    # 서빙 URL 조립 베이스(api 오리진 + context-path) — 로컬은 api(30100)·web(3000) 오리진이
+    # 갈리므로 절대 URL 조립에 사용한다. 배포 환경마다 실 도메인(https://.../api)으로
+    # 오버라이드해야 한다 — 기본값이 http://로 남아있어야 ProdUrlConfigGuard가 미오버라이드를
+    # 기동 시점에 잡아낸다.
+    base-url: ${MEDIA_BASE_URL:http://localhost:30100/api}
