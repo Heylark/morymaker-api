@@ -1,6 +1,7 @@
 package kr.co.morymaker.api.web
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import kr.co.morymaker.api.config.MediaProperties
 import kr.co.morymaker.api.config.SecurityConfig
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -11,7 +12,9 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.mock.web.MockMultipartFile
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
+import org.springframework.test.context.transaction.TestTransaction
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
@@ -21,7 +24,11 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPat
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.transaction.annotation.Transactional
 import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.nio.file.Path
+import java.util.UUID
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -36,7 +43,11 @@ class IdleContentControllerTest(
     @Autowired private val mockMvc: MockMvc,
     @Autowired private val objectMapper: ObjectMapper,
     @Autowired private val jdbcTemplate: JdbcTemplate,
+    @Autowired private val mediaProperties: MediaProperties,
 ) {
+
+    /** [LocalFileStorageAdapter]의 root 해석과 동일 로직(상대경로 기준 불일치 회피). */
+    private fun mediaRoot(): Path = Path.of(mediaProperties.root).toAbsolutePath().normalize()
 
     private val validPng = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A) + ByteArray(16)
 
@@ -295,5 +306,151 @@ class IdleContentControllerTest(
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data[0].play").value("8초 롤링"))
+    }
+
+    // ── delete(§11-4 DELETE, 신규) ──────────────────────────────────────
+
+    @Test
+    fun `delete는 담당 행사 콘텐츠를 삭제하고 200과 삭제된 id를 반환한다`() {
+        val eid = createEvent()
+        val cid = createContent(eid)
+
+        mockMvc.perform(
+            delete("/events/$eid/idle-contents/$cid")
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.id").value(cid))
+
+        val count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM idle_content WHERE id = ?", Int::class.java, cid)
+        assertEquals(0, count, "삭제 후 DB 행이 제거돼야 한다")
+    }
+
+    @Test
+    fun `delete는 콘텐츠가 없으면 404를 받는다`() {
+        val eid = createEvent()
+
+        mockMvc.perform(
+            delete("/events/$eid/idle-contents/존재하지-않는-id")
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
+        )
+            .andExpect(status().isNotFound)
+    }
+
+    /**
+     * IDOR 차단 — 담당 행사 경로로 **타 행사의 cid**를 삭제 시도(:253 update 테스트와 동일 템플릿).
+     * 스코프 게이트(assertAccess)는 경로의 eid만 보므로 이 요청을 통과시킨다 — 매퍼 SQL의
+     * event_id 조건이 유일한 방어선이며, 그 조건이 빠지면 담당 행사 관리자가 남의 행사의
+     * 미디어를 삭제(비가역)할 수 있다.
+     */
+    @Test
+    fun `EVENT_ADMIN이 담당 행사 경로로 타 행사 cid를 삭제하면 404이고 타 행사 행은 삭제되지 않는다`() {
+        val eidA = createEvent("A행사")
+        val eidB = createEvent("B행사")
+        val cidB = createContent(eidB, name = "B행사 콘텐츠")
+
+        mockMvc.perform(
+            delete("/events/$eidA/idle-contents/$cidB")
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eidA))),
+        )
+            .andExpect(status().isNotFound)
+
+        // 응답 코드만으로는 부족하다 — 실 DB 행이 그대로인지 직접 확인한다.
+        val count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM idle_content WHERE id = ?", Int::class.java, cidB)
+        assertEquals(1, count, "타 행사 관리자의 삭제 시도가 B행사 행에 반영됐다(cross-event IDOR)")
+    }
+
+    @Test
+    fun `EVENT_ADMIN이 담당 아닌 행사의 콘텐츠를 삭제하면 403 EVENT_FORBIDDEN을 받는다(cross-tenant DELETE)`() {
+        val eid = createEvent()
+        val cid = createContent(eid)
+
+        mockMvc.perform(
+            delete("/events/$eid/idle-contents/$cid")
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf("다른-행사-id"))),
+        )
+            .andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.error.code").value("EVENT_FORBIDDEN"))
+
+        val count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM idle_content WHERE id = ?", Int::class.java, cid)
+        assertEquals(1, count, "거부된 삭제 시도가 실제로 반영되면 안 된다")
+    }
+
+    @Test
+    fun `EVENT_STAFF는 관리자 콘솔 전용 콘텐츠 삭제 API에서 403 ROLE_FORBIDDEN을 받는다`() {
+        val eid = createEvent()
+        val cid = createContent(eid)
+
+        mockMvc.perform(
+            delete("/events/$eid/idle-contents/$cid")
+                .with(authenticatedAs(roles = listOf("EVENT_STAFF"), eventIds = listOf(eid))),
+        )
+            .andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.error.code").value("ROLE_FORBIDDEN"))
+    }
+
+    @Test
+    fun `delete는 fileUrl이 없는 구 메타 전용 행도 200으로 정상 삭제한다(idempotent, 파일 I O 스킵)`() {
+        val eid = createEvent()
+        val legacyId = UUID.randomUUID().toString()
+        jdbcTemplate.update(
+            "INSERT INTO idle_content (id, event_id, name, kind, mode, play, file_url, file_content_type, sort_order) " +
+                "VALUES (?, ?, ?, ?, NULL, NULL, NULL, NULL, 0)",
+            legacyId, eid, "구 메타 전용 콘텐츠", "이미지",
+        )
+
+        mockMvc.perform(
+            delete("/events/$eid/idle-contents/$legacyId")
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
+        )
+            .andExpect(status().isOk)
+
+        val count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM idle_content WHERE id = ?", Int::class.java, legacyId)
+        assertEquals(0, count)
+    }
+
+    /**
+     * 물리 파일 회수 + 트랜잭션 경계 실 검증(DB 메타 삭제 커밋 확정 후에만 물리 파일을
+     * 지운다는 설계 계약의 실측) — 이 클래스는 `@Transactional`(기본
+     * 롤백)이라 `TestTransaction.flagForCommit()/end()`로 **실제 커밋**을 강제해야
+     * `afterCommit` 콜백이 발화한다(강제하지 않으면 파일 삭제가 절대 관측되지 않는다 — 단위
+     * 테스트의 `initSynchronization` 수동 트리거와 달리 실 Spring 트랜잭션 매니저가 경계를
+     * 판정한다). 커밋 전/후 두 시점을 한 테스트에서 함께 검증해 orphan 방지(§4)와 물리 회수(§3)
+     * 요구를 모두 실측한다.
+     */
+    @Test
+    fun `delete는 실 트랜잭션이 커밋되기 전까지 물리 파일을 남기고, 커밋 후에 DB 메타와 함께 회수한다`() {
+        val eid = createEvent()
+        val cid = createContent(eid)
+        val storageKey = jdbcTemplate.queryForObject(
+            "SELECT file_url FROM idle_content WHERE id = ?", String::class.java, cid,
+        )
+        val filePath = mediaRoot().resolve(storageKey)
+        assertTrue(Files.exists(filePath), "사전조건 — 파일이 실재해야 한다")
+
+        mockMvc.perform(
+            delete("/events/$eid/idle-contents/$cid")
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
+        )
+            .andExpect(status().isOk)
+
+        assertTrue(Files.exists(filePath), "afterCommit 이전(테스트 트랜잭션 미커밋)에는 파일이 삭제되면 안 된다(orphan 방지)")
+
+        TestTransaction.flagForCommit()
+        TestTransaction.end() // 실 커밋 발생 → afterCommit 콜백이 실행되어 물리 삭제가 수행된다.
+
+        assertFalse(Files.exists(filePath), "실 커밋 후 물리 파일이 삭제돼야 한다")
+        assertEquals(
+            0,
+            jdbcTemplate.queryForObject("SELECT COUNT(*) FROM idle_content WHERE id = ?", Int::class.java, cid),
+            "실 커밋 후 DB 메타도 삭제돼야 한다",
+        )
+
+        // 위에서 실 커밋을 강제했으므로 이 테스트가 만든 event 행은 클래스 기본 롤백 대상 밖이다 —
+        // 새 트랜잭션을 열어 명시적으로 정리하고 그 트랜잭션도 커밋해 잔여 데이터를 남기지 않는다.
+        TestTransaction.start()
+        jdbcTemplate.update("DELETE FROM event WHERE id = ?", eid)
+        TestTransaction.flagForCommit()
+        TestTransaction.end()
     }
 }

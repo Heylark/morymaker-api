@@ -15,8 +15,10 @@ import kr.co.morymaker.api.application.port.`in`.SeatGroupUseCase
 import kr.co.morymaker.api.application.port.`in`.ZoneCreateCommand
 import kr.co.morymaker.api.application.port.`in`.ZoneUpdateCommand
 import kr.co.morymaker.api.domain.guest.Guest
+import kr.co.morymaker.api.domain.idle.IdleContent
 import kr.co.morymaker.api.domain.parking.ParkingRecord
 import kr.co.morymaker.api.persistence.mapper.GuestMapper
+import kr.co.morymaker.api.persistence.mapper.IdleContentMapper
 import kr.co.morymaker.api.persistence.mapper.ParkingRecordMapper
 import kr.co.morymaker.api.persistence.mapper.ParkingSlotTitleMapper
 import kr.co.morymaker.api.persistence.mapper.SeatAssignmentMapper
@@ -63,6 +65,7 @@ class CrossEventScopeDefenseIntegrationTest(
     @Autowired private val parkingRecordMapper: ParkingRecordMapper,
     @Autowired private val seatAssignmentMapper: SeatAssignmentMapper,
     @Autowired private val parkingSlotTitleMapper: ParkingSlotTitleMapper,
+    @Autowired private val idleContentMapper: IdleContentMapper,
     @Autowired private val dataSource: DataSource,
 ) {
 
@@ -409,5 +412,25 @@ class CrossEventScopeDefenseIntegrationTest(
 
         parkingSlotTitleMapper.deleteByZoneId(victim, zoneId)
         assertEquals(0, queryInt("SELECT COUNT(*) FROM parking_slot_title WHERE zone_id = ?", zoneId), "소유 행사 호출은 타이틀 행을 삭제해야 한다(EXISTS true)")
+    }
+
+    // ── #13 IdleContentMapper.delete(idle_content DELETE 신규 뮤테이션 — event_id 봉인 실효 검증) ──
+
+    @Test
+    fun `IdleContentMapper delete는 위조 eventId로 0행, 소유 eventId로 1행 매칭된다`() {
+        val (attacker, victim) = twoEvents()
+        val contentId = java.util.UUID.randomUUID().toString()
+        idleContentMapper.insert(
+            IdleContent(
+                id = contentId, eventId = victim, name = "피해자 대기화면 콘텐츠", kind = "이미지",
+                mode = null, play = null, fileUrl = null, fileContentType = null, sortOrder = 0,
+            ),
+        )
+
+        idleContentMapper.delete(attacker, contentId)
+        assertEquals(1, queryInt("SELECT COUNT(*) FROM idle_content WHERE id = ?", contentId), "공격 호출 후 행이 그대로 남아 있어야 한다(0행 삭제)")
+
+        idleContentMapper.delete(victim, contentId)
+        assertEquals(0, queryInt("SELECT COUNT(*) FROM idle_content WHERE id = ?", contentId), "소유 행사 호출은 행을 삭제해야 한다(1행)")
     }
 }
