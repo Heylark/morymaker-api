@@ -7,10 +7,13 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
+import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.mock.web.MockMultipartFile
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.request.RequestPostProcessor
@@ -18,11 +21,13 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPat
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.transaction.annotation.Transactional
 import java.nio.charset.StandardCharsets
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
- * 대기화면 콘텐츠 관리자 API(§11-2~4) 통합 테스트 — CRUD·메타 전용 등록(M2, fileUrl 항상 null)·
- * cross-tenant 격리를 실 MariaDB로 검증한다. 키오스크 무인증 조회는 `PublicIdleContentControllerTest`
- * 별도(무인증 표면 분리).
+ * 대기화면 콘텐츠 관리자 API(§11-2~4) 통합 테스트 — CRUD·multipart 등록(M3, `file` 파트 필수)·
+ * cross-tenant 격리를 실 MariaDB로 검증한다. 키오스크 무인증 조회·서빙은
+ * `PublicIdleContentControllerTest` 별도(무인증 표면 분리).
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -30,7 +35,10 @@ import java.nio.charset.StandardCharsets
 class IdleContentControllerTest(
     @Autowired private val mockMvc: MockMvc,
     @Autowired private val objectMapper: ObjectMapper,
+    @Autowired private val jdbcTemplate: JdbcTemplate,
 ) {
+
+    private val validPng = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A) + ByteArray(16)
 
     private fun authenticatedAs(roles: List<String>? = null, eventIds: List<String>? = null): RequestPostProcessor =
         jwt()
@@ -52,32 +60,55 @@ class IdleContentControllerTest(
         return objectMapper.readTree(response).get("data").get("id").asText()
     }
 
-    private fun createContentRaw(eid: String, body: Map<String, Any?>, eventIds: List<String> = listOf(eid)) =
-        mockMvc.perform(
-            post("/events/$eid/idle-contents")
-                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = eventIds))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(body)),
-        )
+    private fun createContentRaw(
+        eid: String,
+        fields: Map<String, String?>,
+        eventIds: List<String> = listOf(eid),
+        fileBytes: ByteArray? = validPng,
+        fileContentType: String = "image/png",
+    ) = mockMvc.perform(
+        multipart("/events/$eid/idle-contents")
+            .apply { fileBytes?.let { file(MockMultipartFile("file", "asset.png", fileContentType, it)) } }
+            .apply { fields.forEach { (key, value) -> value?.let { param(key, it) } } }
+            .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = eventIds)),
+    )
 
     private fun createContent(eid: String, name: String = "키비주얼_A.png", kind: String = "이미지", sortOrder: Int = 1): String {
-        val response = createContentRaw(eid, mapOf("name" to name, "kind" to kind, "mode" to "branded", "play" to "8초 롤링", "sortOrder" to sortOrder))
+        val response = createContentRaw(eid, mapOf("name" to name, "kind" to kind, "mode" to "branded", "play" to "8초 롤링", "sortOrder" to sortOrder.toString()))
             .andExpect(status().isCreated)
             .andReturn().response.getContentAsString(StandardCharsets.UTF_8)
         return objectMapper.readTree(response).get("data").get("id").asText()
     }
 
-    // ── CRUD(§11-2~4) ─────────────────────────────────────────────
+    // ── create(§11-3, M3 — file 파트 필수) ──────────────────────────
 
     @Test
-    fun `create는 콘텐츠를 등록하고 fileUrl은 항상 null이다(M2 메타 전용, FileStoragePort 스텁)`() {
+    fun `create는 파일을 저장하고 fileUrl에 서빙 URL이 채워진다(DB엔 스토리지 키만 저장)`() {
         val eid = createEvent()
 
-        createContentRaw(eid, mapOf("name" to "행사 홍보영상_final.mp4", "kind" to "영상", "mode" to "fullbleed", "play" to "자동재생 · 무음 · 반복", "sortOrder" to 1))
+        val response = createContentRaw(
+            eid,
+            mapOf("name" to "행사 홍보이미지.png", "kind" to "이미지", "mode" to "fullbleed", "play" to "8초 롤링", "sortOrder" to "1"),
+        )
             .andExpect(status().isCreated)
-            .andExpect(jsonPath("$.data.name").value("행사 홍보영상_final.mp4"))
-            .andExpect(jsonPath("$.data.kind").value("영상"))
-            .andExpect(jsonPath("$.data.fileUrl").doesNotExist())
+            .andExpect(jsonPath("$.data.name").value("행사 홍보이미지.png"))
+            .andExpect(jsonPath("$.data.kind").value("이미지"))
+            .andReturn().response.getContentAsString(StandardCharsets.UTF_8)
+
+        val data = objectMapper.readTree(response).get("data")
+        val cid = data.get("id").asText()
+        val fileUrl = data.get("fileUrl").asText()
+        assertTrue(fileUrl.endsWith("/api/public/events/$eid/idle-contents/$cid/file"), "fileUrl=$fileUrl")
+
+        val storedKey = jdbcTemplate.queryForObject(
+            "SELECT file_url FROM idle_content WHERE id = ?", String::class.java, cid,
+        )
+        assertEquals("$eid/$cid", storedKey, "DB엔 절대 URL이 아니라 스토리지 키만 저장돼야 한다")
+
+        // fileUrl로 노출한 경로 자체가 실제로 서빙되는지 왕복 확인(좌표계 역전은 스키마 단언만으론
+        // 못 잡는다 — MockMvc는 context-path 미적용이므로 /api 접두 없이 호출한다).
+        mockMvc.perform(get("/public/events/$eid/idle-contents/$cid/file"))
+            .andExpect(status().isOk)
     }
 
     @Test
@@ -88,6 +119,46 @@ class IdleContentControllerTest(
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
     }
+
+    @Test
+    fun `create는 file 파트가 없으면 400 MISSING_FILE_PART를 받는다`() {
+        val eid = createEvent()
+
+        createContentRaw(eid, mapOf("name" to "파일없는 등록 시도", "kind" to "이미지"), fileBytes = null)
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.error.code").value("MISSING_FILE_PART"))
+    }
+
+    @Test
+    fun `create는 확장자 위장(시그니처 불일치) 파일을 400 VALIDATION_FAILED로 거부한다`() {
+        val eid = createEvent()
+        val garbage = ByteArray(16) { 0x00 }
+
+        createContentRaw(
+            eid,
+            mapOf("name" to "위장 파일", "kind" to "이미지"),
+            fileBytes = garbage,
+            fileContentType = "image/jpeg",
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+    }
+
+    @Test
+    fun `create는 JSON 요청이면 415 UNSUPPORTED_MEDIA_TYPE을 받는다(멀티파트 전용 전환)`() {
+        val eid = createEvent()
+
+        mockMvc.perform(
+            post("/events/$eid/idle-contents")
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"name":"구 JSON 경로","kind":"이미지"}"""),
+        )
+            .andExpect(status().isUnsupportedMediaType)
+            .andExpect(jsonPath("$.error.code").value("UNSUPPORTED_MEDIA_TYPE"))
+    }
+
+    // ── list / update ────────────────────────────────────────────
 
     @Test
     fun `list는 sortOrder 순으로 콘텐츠를 반환한다`() {
