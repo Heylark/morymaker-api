@@ -18,11 +18,17 @@ COPY module-application/build.gradle.kts ./module-application/
 COPY module-persistence/build.gradle.kts ./module-persistence/
 COPY api-app/build.gradle.kts ./api-app/
 
-# 프로젝트 한정 없이 `dependencies` 만 돌리면 루트 프로젝트(구성 0건)만 실행되고 아무것도
-# 워밍되지 않는다 — 실측 확인(root 프로젝트는 subprojects{} 블록으로 자식에만 플러그인을
-# 적용하므로 자신은 컴파일 구성이 없다). :api-app:dependencies 로 프로젝트를 명시해야
-# module-application·module-persistence·module-domain 을 포함한 전체 그래프가 해석되어
-# 외부 의존성 전체가 이 레이어에서 다운로드된다.
+# 이 레이어가 캐시하는 것은 의존성 "메타데이터"(POM/module 약 490개)와 Gradle 자신의 플러그인
+# 클래스패스(jar 46개)뿐이다. 앱 jar 는 받지 않는다 — `dependencies` 는 리포트 태스크라 그래프만
+# 해석하고 아티팩트를 내려받지 않기 때문이다(`--configuration runtimeClasspath` 를 붙여도 같다).
+# 실측: 이 단계 직후 캐시의 mariadb·mybatis·spring-webmvc·zxing jar 는 전부 0개이고, 앱 jar
+# 140개는 아래 bootJar 단계에서 그때 받아진다. 즉 소스가 바뀌면 앱 jar 는 매번 다시 받는다 —
+# 이 레이어가 아끼는 건 메타데이터 왕복분이지 jar 다운로드가 아니다. jar 까지 워밍하려면
+# 아티팩트를 실제로 해석하는 커스텀 태스크가 필요하고, 그건 빌드 스크립트 변경이라 이 작업이
+# 지키기로 한 "프로덕션 코드·설정 변경 0" 계약 밖이다.
+# ⚠️ 프로젝트(:api-app)를 반드시 명시할 것 — `dependencies` 만 쓰면 루트 프로젝트만 실행되는데
+#    root 는 subprojects{} 로 자식에만 플러그인을 적용해 자신은 구성이 0건이라, 메타데이터조차
+#    한 건도 안 받고 조용히 통과한다.
 RUN ./gradlew :api-app:dependencies --no-daemon
 
 # 나머지 소스 COPY (.dockerignore 가 build/·.gradle/·gradle.properties 등을 컨텍스트에서 제외한다)
