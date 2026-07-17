@@ -20,9 +20,9 @@ import kotlin.test.assertNull
 /**
  * [IdleContentService] 단위 테스트 — [IdleContentPort]/[FileStoragePort]/[EventScopeGuard]를
  * mock으로 대체해 CRUD 오케스트레이션 + 키오스크 공개 조회(listForKiosk·fetchMediaForKiosk)의
- * assertAccess 미호출을 검증한다. cross-tenant·공개 라우트 무인증·대용량 실측 종합 TC는
- * Tester 담당(T-012), 저장·서빙 어댑터 자체 검증은 [kr.co.morymaker.api.storage.LocalFileStorageAdapterTest]
- * 담당(어댑터는 별도 유닛).
+ * assertAccess 미호출을 검증한다. cross-tenant·공개 라우트 무인증·대용량 실측 종합 TC는 실 DB를
+ * 쓰는 통합 테스트가, 저장·서빙 어댑터 자체 검증은 [kr.co.morymaker.api.storage.LocalFileStorageAdapterTest]가
+ * 담당한다(어댑터는 별도 유닛).
  */
 class IdleContentServiceTest {
 

@@ -18,8 +18,8 @@ interface PublicIdleContentUseCase {
     /**
      * 키오스크 미디어 서빙(§11-2, 신설) — 무인증 표면 전용이라 assertAccess를 호출하지 않는다
      * (listForKiosk와 동일 구조). 조회는 기존 `IdleContentPort.fetchById(eventId, contentId)`를
-     * 재사용한다(id-only 신규 포트 신설 금지 — PATTERN-032 동형 결함을 무인증 표면에서 즉시
-     * 실현되는 형태로 신규 생산하게 된다).
+     * 재사용한다 — id만 받는 조회 포트를 새로 만들면 SQL에 event_id 스코프가 없는 조회 경로가
+     * 생기고, 이 표면은 무인증이라 그 결함이 곧바로 타 행사 미디어 유출로 실현된다.
      *
      * @return 콘텐츠 부재·소속 행사 불일치·파일 미보유(구 메타 전용 행)·물리 파일 유실 전부 null.
      */

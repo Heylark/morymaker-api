@@ -19,6 +19,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import org.springframework.http.HttpHeaders
 import org.springframework.transaction.annotation.Transactional
 import java.nio.charset.StandardCharsets
 import kotlin.test.assertTrue
@@ -28,7 +29,7 @@ import kotlin.test.assertTrue
  * event_id 필터 격리·존재하지 않는 eid의 fail-open(빈 배열, 404 아님, 목록 한정)을
  * 실 MariaDB로 검증한다. 미디어 서빙(`/{cid}/file`)은 목록과 반대로 부재 시 404다.
  *
- * REQ-0030-01 T-011 항목 ①(cross-event 차단) ③(미인증 접근 200) 커버.
+ * 커버 범위: cross-event 차단 / 미인증 접근 200 / Range 왕복.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -127,6 +128,42 @@ class PublicIdleContentControllerTest(
         assertTrue(response.contentAsByteArray.isNotEmpty(), "서빙 응답 바디가 비어 있으면 안 된다")
     }
 
+    // ── Range(206) 왕복 — Spring의 자동 Range 처리가 반환 타입(FileSystemResource)에 실제로
+    //    종속되는지 실 MockMvc 파이프라인으로 확인한다. InputStreamResource로 바뀌면 Range가
+    //    조용히 무력화돼 200만 반환하지만 육안 재생·소용량 바이트 비교로는 드러나지 않는다
+    //    (Spring이 InputStreamResource를 Range 대상에서 명시 배제한다) — 그래서 헤더·상태코드·
+    //    부분 바이트 길이까지 확인한다. ──
+
+    @Test
+    fun `Range 요청은 206과 Content-Range·Accept-Ranges 헤더를 받고 요청한 바이트만 반환한다`() {
+        val eid = createEvent()
+        val cid = createContent(eid, "홍보이미지.png", 1)
+
+        val response = mockMvc.perform(
+            get("/public/events/$eid/idle-contents/$cid/file").header(HttpHeaders.RANGE, "bytes=0-9"),
+        )
+            .andExpect(status().isPartialContent)
+            .andExpect(header().string("Accept-Ranges", "bytes"))
+            .andExpect(header().string("Content-Range", "bytes 0-9/${validPng.size}"))
+            .andExpect(header().longValue("Content-Length", 10))
+            .andReturn().response
+
+        assertTrue(response.contentAsByteArray.size == 10, "Range 요청인데 전체 바이트가 반환되면 Range가 무력화된 것이다")
+        assertTrue(response.contentAsByteArray.contentEquals(validPng.copyOfRange(0, 10)))
+    }
+
+    @Test
+    fun `파일 크기를 벗어난 Range 요청은 416을 받는다`() {
+        val eid = createEvent()
+        val cid = createContent(eid, "홍보이미지.png", 1)
+
+        mockMvc.perform(
+            get("/public/events/$eid/idle-contents/$cid/file")
+                .header(HttpHeaders.RANGE, "bytes=${validPng.size + 1000}-${validPng.size + 2000}"),
+        )
+            .andExpect(status().isRequestedRangeNotSatisfiable)
+    }
+
     // ── ① 미디어 서빙 — 부재/cross-event는 404 ──────────────────────
 
     @Test
@@ -150,9 +187,9 @@ class PublicIdleContentControllerTest(
 
     @Test
     fun `file_url이 없는 구 메타 전용 행은 서빙 요청 시 404를 받는다(하위호환)`() {
-        // 등록 자체가 M3부터 file 필수라 정상 플로우로는 이 상태를 만들 수 없다 — nullable
-        // 유지(ADR-007)가 보호하려는 대상은 마이그레이션 이전에 이미 존재하던 이런 행이므로
-        // 직접 삽입으로 재현한다.
+        // 등록 자체가 M3부터 file 필수라 정상 플로우로는 이 상태를 만들 수 없다 — fileUrl을
+        // nullable로 남겨둔 것이 보호하려는 대상은 마이그레이션 이전에 이미 존재하던 이런
+        // 행이므로 직접 삽입으로 재현한다.
         val eid = createEvent()
         val cid = java.util.UUID.randomUUID().toString()
         jdbcTemplate.update(

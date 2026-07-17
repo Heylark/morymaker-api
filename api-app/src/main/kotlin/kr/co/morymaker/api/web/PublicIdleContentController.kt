@@ -34,7 +34,7 @@ import java.nio.charset.StandardCharsets
  * 타 행사 cid가 동일 404이므로 oracle이 생기지 않는다(CP-2 결정 — 무인증 공개 + rate limit
  * 미등록. `WebMvcConfig`가 이 경로에 `PublicRateLimitInterceptor`를 등록하지 않는다 — 등록하면
  * 행사장 단일 NAT에서 키오스크 미디어 GET이 현장등록 POST 예산을 소진해 정상 등록이 429로
- * 거부된다, 실측 근거는 02-architect.md ADR-004).
+ * 거부된다 — 카운터 키가 remoteAddr 단독이고 임계가 전역 공유이기 때문이다).
  */
 @RestController
 @RequestMapping("/public/events/{eid}/idle-contents")

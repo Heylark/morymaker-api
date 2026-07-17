@@ -40,8 +40,8 @@ internal class IdleContentService(
     }
 
     // 저장 성공 후 insert 실패 시 파일이 orphan으로 남지 않도록, store()는 이 트랜잭션 내부에서
-    // 호출된다 — 어댑터가 트랜잭션 동기화로 자기 부작용을 자기 안에서 보상한다(ADR-009, 포트
-    // 계약 무변화). contentId를 먼저 생성해 저장·영속 양쪽에 동일 식별자로 사용한다.
+    // 호출된다 — 어댑터가 트랜잭션 동기화로 자기 부작용을 자기 안에서 보상한다(포트 계약
+    // 무변화). contentId를 먼저 생성해 저장·영속 양쪽에 동일 식별자로 사용한다.
     @Transactional
     override fun create(eventId: String, command: IdleContentCreateCommand): IdleContentView {
         eventScopeGuard.assertAccess(eventId)

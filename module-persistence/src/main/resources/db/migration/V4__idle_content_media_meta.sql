@@ -1,4 +1,4 @@
--- V4 — 대기화면 미디어 실 저장 도입에 따른 MIME 메타 컬럼 추가(REQ-0030-01).
+-- V4 — 대기화면 미디어 실 저장 도입에 따른 MIME 메타 컬럼 추가.
 --
 -- idle_content.file_content_type — magic byte(콘텐츠 시그니처) 검증으로 확정된 MIME. 서빙
 -- endpoint의 Content-Type 단일 진실 소스(서빙 시점 재검사·확장자 추정 어느 쪽도 채택하지

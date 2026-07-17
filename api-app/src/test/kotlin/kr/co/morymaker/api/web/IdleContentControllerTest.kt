@@ -241,6 +241,39 @@ class IdleContentControllerTest(
             .andExpect(jsonPath("$.error.code").value("ROLE_FORBIDDEN"))
     }
 
+    /**
+     * 담당 행사 경로로 **타 행사의 cid**를 수정 시도하는 경로 — 스코프 게이트(assertAccess)는
+     * 경로의 eid만 보므로 이 요청을 통과시킨다. 따라서 조회 SQL의 event_id 조건이 유일한
+     * 방어선이며, 그 조건이 빠지면 담당 행사 관리자가 남의 행사 행을 덮어쓸 수 있다.
+     *
+     * 게이트에서 403으로 걸리는 위 테스트와 달리 이 경로는 게이트를 통과하므로, 두 테스트는
+     * 서로 다른 방어선을 검증한다 — 어느 쪽도 다른 쪽을 대신하지 못한다.
+     */
+    @Test
+    fun `EVENT_ADMIN이 담당 행사 경로로 타 행사 cid를 수정하면 404이고 타 행사 행은 변경되지 않는다`() {
+        val eidA = createEvent("A행사")
+        val eidB = createEvent("B행사")
+        val cidB = createContent(eidB, name = "B행사 콘텐츠")
+
+        mockMvc.perform(
+            put("/events/$eidA/idle-contents/$cidB")
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eidA)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"mode":"침입 시도","play":"침입 시도","sortOrder":99}"""),
+        )
+            .andExpect(status().isNotFound)
+
+        // 응답 코드만으로는 부족하다 — 실 DB 행이 그대로인지 직접 확인한다.
+        val mode = jdbcTemplate.queryForObject(
+            "SELECT mode FROM idle_content WHERE id = ?", String::class.java, cidB,
+        )
+        val sortOrder = jdbcTemplate.queryForObject(
+            "SELECT sort_order FROM idle_content WHERE id = ?", Int::class.java, cidB,
+        )
+        assertEquals("branded", mode, "타 행사 관리자의 수정이 B행사 행에 반영됐다(cross-event 침투)")
+        assertEquals(1, sortOrder, "타 행사 관리자의 수정이 B행사 행에 반영됐다(cross-event 침투)")
+    }
+
     @Test
     fun `EVENT_ADMIN이 담당 아닌 행사의 콘텐츠를 수정하면 403 EVENT_FORBIDDEN을 받는다(cross-tenant PUT)`() {
         val eid = createEvent()

@@ -95,9 +95,10 @@ internal class LocalFileStorageAdapter(
         return target
     }
 
-    // insert 실패 시 파일이 orphan으로 남지 않도록 자기 부작용을 자기 안에서 보상한다(ADR-009) —
-    // 포트 계약은 무변화(application은 보상을 알 필요가 없다). 트랜잭션 동기화가 비활성이면
-    // (배치·테스트 등 트랜잭션 밖 호출) 보상 등록 자체를 생략한다.
+    // insert 실패 시 파일이 orphan으로 남지 않도록 자기 부작용을 자기 안에서 보상한다 —
+    // 파일시스템 write는 DB 트랜잭션이 롤백돼도 되돌아가지 않기 때문이다. 포트 계약은 무변화
+    // (application은 보상을 알 필요가 없다). 트랜잭션 동기화가 비활성이면(배치·테스트 등
+    // 트랜잭션 밖 호출) 보상 등록 자체를 생략한다.
     private fun registerRollbackCompensation(target: Path) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) return
         TransactionSynchronizationManager.registerSynchronization(

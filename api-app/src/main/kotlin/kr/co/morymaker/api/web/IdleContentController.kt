@@ -34,7 +34,8 @@ import org.springframework.web.multipart.MultipartFile
  * (`/public/events/{eid}/idle-contents`)가 별도로 담당한다.
  *
  * 등록(POST)은 M3부터 multipart 전용이다(`file` 파트 필수) — 메타만 있고 파일이 없는 중간
- * 상태를 구조적으로 불가능하게 만드는 것이 대기화면 조용한 실패(REQ-0030) 근본 수정의 핵심이다.
+ * 상태를 구조적으로 불가능하게 만드는 것이, 파일 없이 등록된 콘텐츠가 대기화면에 파일명
+ * 텍스트만 렌더되던 조용한 실패의 근본 수정이다.
  */
 @RestController
 @RequestMapping("/events/{eid}/idle-contents")
@@ -59,7 +60,7 @@ class IdleContentController(
         @Valid @ModelAttribute request: IdleContentCreateRequest,
     ): ApiResponse<IdleContentResponse> = file.inputStream.use { stream ->
         // 스트림 소유권은 이 컨트롤러(호출자)가 갖는다 — use{}가 유스케이스 호출을 감싸 종료
-        // 시점에 close한다. 어댑터는 close하지 않는다(FileStoragePort 계약, ADR-001).
+        // 시점에 close한다. 어댑터는 close하지 않는다(FileStoragePort 계약).
         val command = IdleContentCreateCommand(
             name = request.name,
             kind = request.kind,

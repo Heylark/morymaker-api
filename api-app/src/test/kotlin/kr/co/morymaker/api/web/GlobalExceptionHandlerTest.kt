@@ -4,6 +4,7 @@ import io.mockk.every
 import io.mockk.mockk
 import jakarta.validation.ConstraintViolationException
 import kr.co.morymaker.api.application.parking.SlotOccupiedException
+import kr.co.morymaker.api.storage.MediaTooLargeException
 import org.junit.jupiter.api.Test
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -141,6 +142,32 @@ class GlobalExceptionHandlerTest {
 
         @GetMapping("/probe/ise")
         fun throwIse(): ResponseEntity<Unit> = throw IllegalStateException("상태 오류")
+    }
+
+    // 대기화면 미디어 업로드 컨테이너 상한(영상 200MB) 초과 매핑 — 실 컨테이너가
+    // 던지는 지점(대용량 실 멀티파트 파싱)은 인증 인프라(JwtDecoder가 실 auth 서버 JWK를
+    // 요구) 제약으로 이 테스트 스위트에서 실 HTTP 재현이 불가하다(LargeMediaRoundTripTest
+    // KDoc 참조) — 여기서는 핸들러 매핑 자체(413·FILE_TOO_LARGE, 500 아님)만 증명한다.
+    // 컨테이너 상한 설정값(`max-file-size: 200MB`)은 application.yml에 정적 확인됨.
+    @Test
+    fun `MaxUploadSizeExceededException은 413과 FILE_TOO_LARGE를 반환한다(500 아님)`() {
+        val response = handler.handleMaxUploadSizeExceeded(
+            org.springframework.web.multipart.MaxUploadSizeExceededException(200L * 1024 * 1024),
+        )
+
+        assertEquals(HttpStatus.PAYLOAD_TOO_LARGE, response.statusCode)
+        assertEquals("FILE_TOO_LARGE", response.body?.error?.code)
+    }
+
+    // 앱 정책 상한(이미지 20MB) 초과 — 컨테이너 초과(위 테스트)와 동일 코드로 통일한다.
+    // 클라이언트 입장에선 둘 다 "파일이 큼"이라 구분할 이유가 없다.
+    @Test
+    fun `MediaTooLargeException은 413과 FILE_TOO_LARGE를 반환한다`() {
+        val response = handler.handleMediaTooLarge(MediaTooLargeException("파일 용량이 상한(20MB)을 초과했습니다"))
+
+        assertEquals(HttpStatus.PAYLOAD_TOO_LARGE, response.statusCode)
+        assertEquals("FILE_TOO_LARGE", response.body?.error?.code)
+        assertEquals("파일 용량이 상한(20MB)을 초과했습니다", response.body?.error?.message)
     }
 
     @Test

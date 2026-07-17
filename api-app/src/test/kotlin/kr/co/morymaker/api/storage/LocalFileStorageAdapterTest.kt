@@ -17,11 +17,12 @@ import kotlin.test.assertTrue
 
 /**
  * [LocalFileStorageAdapter] 단위 테스트 — `@TempDir`로 실 미디어 루트를 격리한다(이 저장소
- * 최초 `@TempDir` 도입, 02-architect.md §13-7). Spring 컨텍스트를 기동하지 않으므로 트랜잭션
- * 동기화가 비활성 상태다 — 롤백 보상(ADR-009) 자체는 이 테스트의 검증 대상이 아니다(등록을
+ * 최초 `@TempDir` 도입). Spring 컨텍스트를 기동하지 않으므로 트랜잭션 동기화가 비활성 상태다 —
+ * 트랜잭션 롤백 시 파일을 지우는 보상 로직 자체는 이 테스트의 검증 대상이 아니다(보상 등록을
  * 스킵하는 분기만 통과한다).
  *
- * REQ-0030-01 T-011 항목 ②(검증 우회 거부) ④(path traversal 차단) ⑤(임시파일 정리) 커버.
+ * 커버 범위: 검증 우회 거부(시그니처 위장·kind 불일치·크기 상한) / path traversal 차단 /
+ * 실패 경로 임시파일 정리.
  */
 class LocalFileStorageAdapterTest {
 
@@ -141,8 +142,31 @@ class LocalFileStorageAdapterTest {
         assertNull(result, "타 행사 eventId로 조회하면 파일이 실재해도 null이어야 한다")
     }
 
+    /**
+     * 페이로드는 반드시 **실재하는** root 밖 파일을 겨냥해야 한다. 존재하지 않는 경로를 쓰면
+     * 경로 봉인이 아니라 뒤따르는 파일 존재 검사에서 null이 나오므로, 봉인을 통째로 제거해도
+     * 이 테스트가 통과해 버린다(가드처럼 보이나 가드가 아닌 상태).
+     */
     @Test
-    fun `resolve는 storageKey가 traversal 페이로드를 포함해도 root 밖으로 벗어나지 않는다`(@TempDir tempDir: Path) {
+    fun `resolve는 storageKey가 traversal 페이로드를 포함하면 root 밖 실재 파일에도 도달하지 못한다`(
+        @TempDir base: Path,
+    ) {
+        val root = base.resolve("media")
+        Files.createDirectories(root)
+        // root 밖(형제 위치)에 실재하는 파일 — 봉인이 없으면 여기에 도달한다.
+        val outsideFile = base.resolve("secret.txt")
+        Files.writeString(outsideFile, "root 밖 파일")
+        val eventId = UUID.randomUUID().toString()
+
+        // eventId 접두 검사는 통과하면서 root를 이탈해 실재 파일을 겨냥한다.
+        val result = LocalFileStorageAdapter(MediaProperties(root = root.toString()))
+            .resolve(eventId, "$eventId/../../secret.txt")
+
+        assertNull(result, "경로 봉인이 뚫려 root 밖 실재 파일에 도달했다")
+    }
+
+    @Test
+    fun `resolve는 파일이 존재하지 않는 traversal 페이로드도 null을 반환한다`(@TempDir tempDir: Path) {
         val eventId = UUID.randomUUID().toString()
 
         val result = adapter(tempDir).resolve(eventId, "$eventId/../../../../etc/passwd")

@@ -14,7 +14,7 @@
     별칭 표에서 "int"는 래퍼 타입(java.lang.Integer)에 매핑되고 프리미티브는 "_int" 접두사
     별칭이 맡는다(ParkingZoneMapper.xml start_no/slot_count와 동일 원인).
 
-    file_content_type(V4 신설) — 대기화면 미디어 실 저장 도입(REQ-0030-01)으로 추가. fileUrl과
+    file_content_type(V4 신설) — 대기화면 미디어 실 저장 도입으로 추가. fileUrl과
     생멸을 같이한다(구 메타 전용 행은 둘 다 NULL, 신규 행은 둘 다 non-null).
 
     createdAt 없음 — V1__init.sql idle_content 테이블에 해당 컬럼 자체가 없다(IdleContent

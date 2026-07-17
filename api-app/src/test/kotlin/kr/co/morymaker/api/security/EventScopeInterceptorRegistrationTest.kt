@@ -38,11 +38,11 @@ class EventScopeInterceptorRegistrationTest(
         assertTrue(chain.interceptorList.any { it is EventScopeInterceptor })
     }
 
-    // REQ-0030-01 T-011 항목 ⑥ — CP-2 결정(미디어 rate limit "미등록 유지")이 코드로 봉인됐는지
-    // 확인한다. 등록하면 행사장 단일 NAT에서 키오스크 미디어 GET이 현장등록 POST 예산을
-    // 소진해 정상 등록이 429로 거부된다(실측, 02-architect.md ADR-004) — 이 부재는 결함이
-    // 아니라 의도된 설계이므로, 누군가 broad "/public/events/**" 패턴으로 무심코 재등록하는
-    // 회귀를 이 테스트가 막는다.
+    // 미디어 서빙 경로에 rate limit을 "미등록으로 둔다"는 결정이 코드로 봉인됐는지 확인한다.
+    // 등록하면 행사장 단일 NAT에서 키오스크 미디어 GET이 현장등록 POST 예산을 소진해 정상
+    // 등록이 429로 거부된다(카운터 키가 remoteAddr 단독 + 임계 전역 공유이기 때문) — 이 부재는
+    // 결함이 아니라 의도된 설계이므로, 누군가 broad "/public/events/**" 패턴으로 무심코
+    // 재등록하는 회귀를 이 테스트가 막는다.
     @Test
     fun `public events idle-contents file 서빙 경로에는 PublicRateLimitInterceptor가 등록되지 않는다`() {
         val request = MockHttpServletRequest("GET", "/public/events/ev-1/idle-contents/cid-1/file")
