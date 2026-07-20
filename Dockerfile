@@ -68,8 +68,8 @@ RUN mkdir -p /app/var/media && chown -R morymaker:morymaker /app/var
 
 USER morymaker
 
-EXPOSE 30100
-# AJP(30101)는 의도적으로 미노출 — 컨테이너 네트워크 토폴로지가 정해지기 전까지 열지 않는다.
+EXPOSE 50200
+# AJP(50201)는 의도적으로 미노출 — 컨테이너 네트워크 토폴로지가 정해지기 전까지 열지 않는다.
 # 절대 host publish 금지: secret 이 유일한 방어선인 채로 노출하면 안 된다(토폴로지 결정은
 # 별도 배포 인프라 작업에서 compose 네트워크·httpd 연동과 함께 진행).
 
@@ -77,7 +77,7 @@ EXPOSE 30100
 # DB 준비가 늦으면 그 사이 DOWN 이 뜬다. --start-period 없이 붙이면 컨테이너가 뜨자마자
 # unhealthy 로 낙인찍힌다.
 HEALTHCHECK --start-period=30s --interval=10s --timeout=3s --retries=3 \
-  CMD curl -f http://localhost:30100/api/actuator/health || exit 1
+  CMD curl -f http://localhost:50200/api/actuator/health || exit 1
 
 # exec form — java 가 PID 1 로 SIGTERM 을 직접 받는다(shell form 이면 sh 가 PID 1 이 되어
 # graceful shutdown 이 깨진다). 프로필·시크릿은 이미지에 굽지 않는다 — 전부 런타임 env 로만
