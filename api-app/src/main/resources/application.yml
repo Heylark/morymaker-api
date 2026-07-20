@@ -1,12 +1,88 @@
 server:
   port: 30100
+  servlet:
+    context-path: /api
 
 spring:
   application:
     name: morymaker-api
+  datasource:
+    # infra/docker-compose.yml — 로컬은 13306 외부 포트로 MariaDB 노출. auth와 같은 DB를 공유한다.
+    url: jdbc:mariadb://localhost:13306/${DB_NAME:morymaker}
+    username: root
+    password: ${DB_ROOT_PASSWORD:changeme}
+    driver-class-name: org.mariadb.jdbc.Driver
+  flyway:
+    enabled: true
+    # auth 서버가 같은 DB에 별도 이력으로 마이그레이션을 실행한다 — 기본 이력 테이블명을 그대로
+    # 쓰면 두 서비스의 버전 이력이 뒤섞여 충돌한다. 서비스별 이력 테이블로 분리.
+    table: flyway_schema_history_api
+    placeholder-replacement: false
+    locations: classpath:db/migration
+    # 이 DB에는 이미 auth 서버가 만든 테이블이 있어 Flyway가 "이력 테이블은 없는데 스키마는
+    # 비어있지 않다"고 판단해 기본값으로는 기동을 거부한다. baseline-version을 V1 이전(0)으로
+    # 잡아 baseline만 새로 세우고 V1은 정상적으로 적용되게 한다(비어있지 않음 = 이미 존재하는
+    # 다른 서비스 테이블일 뿐 이 서비스의 첫 마이그레이션 자체를 건너뛰면 안 됨).
+    baseline-on-migrate: true
+    baseline-version: 0
+  servlet:
+    multipart:
+      # 영상 200MB 상한(CP-2 확정) — 이미지 20MB는 앱이 kind 판별 후 별도 분기 검증한다(단일
+      # 컨테이너 상한으로는 두 값을 동시에 표현할 수 없다).
+      max-file-size: 200MB
+      max-request-size: 210MB
+      # Boot 기본값과 동일 — 디스크 스풀 의도를 명시 박제한다. 0 초과 값은 그만큼 메모리
+      # 버퍼링을 켜 "서빙·저장 전체 로드 금지" 확정 제약을 스스로 위반한다.
+      file-size-threshold: 0B
+
+mybatis:
+  mapper-locations: classpath*:mapper/**/*.xml
 
 management:
   endpoints:
     web:
       exposure:
         include: health
+
+morymaker:
+  auth:
+    # 발급 토큰의 iss 클레임 신뢰 앵커. 배포 환경마다 실 도메인으로 반드시 오버라이드해야 한다.
+    issuer: ${AUTH_ISSUER:http://localhost:30000}
+    jwk-set-uri: ${AUTH_ISSUER:http://localhost:30000}/oauth2/jwks
+  web:
+    # 콘솔·실행자·키오스크·방문자 4표면이 사용하는 프론트 오리진(CORS 허용 목록, 콤마 구분).
+    allowed-origins: ${ALLOWED_ORIGINS:http://localhost:3000}
+  parking:
+    # 주차 자리 QR payload 베이스(§6-4) — 자리 중립 URL(`/p/{slotCode}`)이라 운영 방식이 바뀌어도
+    # 재인쇄가 필요 없다(3-6). 배포 환경마다 실 도메인(https://.../app)으로 오버라이드해야 한다 —
+    # 기본값이 http:// 로 남아있어야 ProdUrlConfigGuard가 미오버라이드를 기동 시점에 잡아낸다.
+    qr-base-url: ${PARKING_QR_BASE_URL:http://localhost:3000/app}
+  public:
+    # 방문자 표면 도메인 — 체크인 QR URL 조립 베이스(`{eventBaseUrl}/u/{token}`). 배포 환경마다
+    # 실 도메인(https://.../app)으로 오버라이드해야 한다.
+    event-base-url: ${PUBLIC_EVENT_BASE_URL:http://localhost:3000/app}
+    # 주차 진입 QR 스캔 URL(정적값) — `qr-base-url`과 별개 env(파생값이라 접미 `/p`까지 포함).
+    park-scan-url: ${PUBLIC_PARK_SCAN_URL:http://localhost:3000/app/p}
+    rate-limit:
+      # 현장등록 POST 전용 인메모리 고정윈도(IP 키) — 공용 데스크 태블릿 오탐 완화 위해 넉넉히.
+      limit: ${PUBLIC_RATE_LIMIT:20}
+      window-seconds: ${PUBLIC_RATE_LIMIT_WINDOW_SECONDS:60}
+  sms:
+    # 실 채널 어댑터(벤더 확정 후 별도 REQ) 도입 시 사용할 설정 키 자리 — 현재는 무-네트워크
+    # 스텁(SmsSenderStubAdapter)만 존재해 아래 값이 어디에도 소비되지 않는다. 벤더 계약 후
+    # SmsSenderProdGuard가 prod 기동을 통과하려면 SmsSenderPort의 새 구현체가 이 값들을 읽어야
+    # 한다. .env.example이 아직 없어(별도 트랙 진행 중) 실값 오버라이드 없이 주석으로만 자리를
+    # 확정한다 — 벤더별 SDK가 요구하는 자격증명 형태가 달라 정확한 키 이름·개수는 벤더 확정 후
+    # 조정될 수 있다.
+    # vendor: (확정 벤더명 — 후보 비교 검토 후 결정)
+    # sender-number: (사전등록된 발신번호, 변경 시 벤더사 재등록 리드타임 발생)
+    # api-key: ${SMS_API_KEY:}
+    # api-secret: ${SMS_API_SECRET:}
+  media:
+    # 대기화면 미디어 저장 루트(repo 상대 기본값 — 개발자 머신 root 권한·재부팅 소실 문제 회피).
+    root: ${MEDIA_ROOT:./var/media}
+    # 서빙 URL 조립 베이스(api 오리진 + context-path) — 로컬은 api(30100)·web(3000) 오리진이
+    # 갈리므로 절대 URL 조립에 사용한다. 배포 환경마다 실 도메인(https://.../api)으로
+    # 오버라이드해야 한다 — 기본값이 http://로 남아있어야 ProdUrlConfigGuard가 미오버라이드를
+    # 기동 시점에 잡아낸다.
+    base-url: ${MEDIA_BASE_URL:http://localhost:30100/api}

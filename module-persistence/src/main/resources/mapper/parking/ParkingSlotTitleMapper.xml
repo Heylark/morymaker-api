@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+    ParkingSlotTitleMapper.xml — parking_slot_title 테이블(1테이블1파일, §6-3 신설).
+
+    복합 자연키(zone_id, slot_no)의 매핑성 테이블 — 하드 삭제(delete-insert)를 쓴다(구획 수정 시
+    override 전체를 zone_id 기준 전삭제 후 재삽입, mybatis.md 표준 6개 메서드의 소프트 삭제 예외).
+
+    <constructor> 선언 순서는 ParkingSlotTitle 주 생성자 파라미터 순서와 정확히 일치한다:
+    (zoneId, slotNo, titleOverride). positional index 금지 — 컬럼명 기반 명시 매핑.
+    slot_no도 ParkingZoneMapper와 동일 사유로 "_int" 사용(Kotlin non-null Int → 프리미티브).
+-->
+<mapper namespace="kr.co.morymaker.api.persistence.mapper.ParkingSlotTitleMapper">
+
+    <resultMap id="BaseResultMap" type="kr.co.morymaker.api.domain.parking.ParkingSlotTitle">
+        <constructor>
+            <arg column="zone_id"        javaType="String"/>
+            <arg column="slot_no"        javaType="_int"/>
+            <arg column="title_override" javaType="String"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="columns">
+        zone_id
+        , slot_no
+        , title_override
+    </sql>
+
+    <select id="findByZoneId" resultMap="BaseResultMap">
+        SELECT
+            <include refid="columns"/>
+        FROM parking_slot_title
+        WHERE zone_id = #{zoneId}
+        ORDER BY slot_no ASC
+    </select>
+
+    <!-- parking_slot_title에는 event_id 컬럼이 없다 — parking_zone JOIN으로 행사 격리(§6-1 목록 N+1 회피). -->
+    <select id="findByEventId" resultMap="BaseResultMap">
+        SELECT
+            pst.zone_id
+            , pst.slot_no
+            , pst.title_override
+        FROM parking_slot_title pst
+        JOIN parking_zone pz ON pst.zone_id = pz.id
+        WHERE pz.event_id = #{eventId}
+    </select>
+
+    <!--
+        zone_id 기준 전삭제(§6-3 delete-insert 1단계). parking_slot_title에는 event_id 컬럼이 없어
+        parking_zone을 경유한 EXISTS 상관 서브쿼리로 event 스코프를 봉인한다(zone.id가 PK라 단건
+        존재검사) — cross-event 격리 방어심층. 정상(zone∈event)이면 EXISTS
+        true로 기존과 동일 삭제, 위조된 타 행사 zoneId는 EXISTS false로 0행 매칭되어 차단된다.
+    -->
+    <delete id="deleteByZoneId">
+        DELETE FROM parking_slot_title
+         WHERE zone_id = #{zoneId}
+           AND EXISTS (
+               SELECT 1 FROM parking_zone pz
+                WHERE pz.id = #{zoneId} AND pz.event_id = #{eventId}
+           )
+    </delete>
+
+    <insert id="insertBatch">
+        INSERT INTO parking_slot_title (
+            zone_id
+            , slot_no
+            , title_override
+        ) VALUES
+        <foreach collection="list" item="item" separator=",">
+        ( #{item.zoneId}
+        , #{item.slotNo}
+        , #{item.titleOverride}
+        )
+        </foreach>
+    </insert>
+
+</mapper>

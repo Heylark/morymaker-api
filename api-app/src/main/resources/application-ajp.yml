@@ -1,0 +1,7 @@
+morymaker:
+  tomcat:
+    ajp:
+      enabled: true
+      secret: ${AJP_SECRET:}      # 기본값 없음 — 미주입 시 Tomcat init 거부(fail-fast)
+      # port·address는 TomcatAjpProperties 기본값(30101 / 127.0.0.1) 사용.
+      # 다른 토폴로지면 여기서 override.

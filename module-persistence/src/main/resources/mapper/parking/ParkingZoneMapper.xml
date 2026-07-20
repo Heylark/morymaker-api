@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+    ParkingZoneMapper.xml — parking_zone 테이블(1테이블1파일, §6 신설).
+
+    <constructor> 선언 순서는 ParkingZone 주 생성자 파라미터 순서와 정확히 일치해야 한다:
+    (id, eventId, part1, part2, part3, part4, startNo, slotCount, createdAt).
+    positional index(번호로 컬럼을 꺼내는 방식) 금지 — 컬럼명 기반 명시 매핑(GuestMapper·EventMapper와 동일 원칙).
+
+    ⚠️ start_no/slot_count의 <constructor> javaType은 "int"가 아니라 "_int"여야 한다. 두 필드
+    (Kotlin non-null Int)는 JVM 생성자 시그니처에서 프리미티브 int로 컴파일되는데, MyBatis 기본
+    별칭 표에서 "int"는 래퍼 타입(java.lang.Integer)에 매핑되고 프리미티브는 "_int" 접두사
+    별칭이 맡는다(EventMapper.xml active의 "_boolean" 사례와 동일 원인).
+
+    created_at: DATETIME ↔ java.time.Instant(InstantTypeHandler 자동 등록, Guest·Event와 동일).
+-->
+<mapper namespace="kr.co.morymaker.api.persistence.mapper.ParkingZoneMapper">
+
+    <resultMap id="BaseResultMap" type="kr.co.morymaker.api.domain.parking.ParkingZone">
+        <constructor>
+            <idArg column="id"         javaType="String"/>
+            <arg   column="event_id"   javaType="String"/>
+            <arg   column="part1"      javaType="String"/>
+            <arg   column="part2"      javaType="String"/>
+            <arg   column="part3"      javaType="String"/>
+            <arg   column="part4"      javaType="String"/>
+            <arg   column="start_no"   javaType="_int"/>
+            <arg   column="slot_count" javaType="_int"/>
+            <arg   column="created_at" javaType="java.time.Instant"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="columns">
+        id
+        , event_id
+        , part1
+        , part2
+        , part3
+        , part4
+        , start_no
+        , slot_count
+        , created_at
+    </sql>
+
+    <select id="findByEvent" resultMap="BaseResultMap">
+        SELECT
+            <include refid="columns"/>
+        FROM parking_zone
+        WHERE event_id = #{eventId}
+        ORDER BY created_at ASC
+    </select>
+
+    <select id="fetchById" resultMap="BaseResultMap">
+        SELECT
+            <include refid="columns"/>
+        FROM parking_zone
+        WHERE event_id = #{eventId}
+          AND id = #{id}
+    </select>
+
+    <select id="findById" resultMap="BaseResultMap">
+        SELECT
+            <include refid="columns"/>
+        FROM parking_zone
+        WHERE id = #{id}
+    </select>
+
+    <insert id="insert" parameterType="kr.co.morymaker.api.domain.parking.ParkingZone">
+        INSERT INTO parking_zone (
+            id
+            , event_id
+            , part1
+            , part2
+            , part3
+            , part4
+            , start_no
+            , slot_count
+            , created_at
+        ) VALUES (
+            #{id}
+            , #{eventId}
+            , #{part1}
+            , #{part2}
+            , #{part3}
+            , #{part4}
+            , #{startNo}
+            , #{slotCount}
+            , #{createdAt}
+        )
+    </insert>
+
+    <update id="update" parameterType="kr.co.morymaker.api.domain.parking.ParkingZone">
+        UPDATE parking_zone
+           SET  part1      = #{part1}
+              , part2      = #{part2}
+              , part3      = #{part3}
+              , part4      = #{part4}
+              , start_no   = #{startNo}
+              , slot_count = #{slotCount}
+         WHERE id = #{id}
+           AND event_id = #{eventId}
+    </update>
+
+</mapper>

@@ -1,0 +1,343 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+    GuestMapper.xml — guest 테이블(1테이블1파일).
+
+    두 resultMap을 쓴다(02-architect §5-1 — BaseResultMap 재사용 아님, 별도 constructor):
+    - BaseResultMap(type=Guest) — 쓰기 대상 pure 도메인, 13컬럼만.
+    - DetailResultMap(type=GuestListItem) — 13컬럼 + seat_group LEFT JOIN의 seat_label.
+    두 <constructor> 모두 선언 순서가 각 클래스의 주 생성자 파라미터 순서와 정확히 일치해야
+    한다(positional index 금지 — 컬럼명 기반 명시 매핑이라 컬럼 순서 자체는 안전하지만
+    생성자 인자 개수·타입은 XML과 항상 짝을 맞춘다).
+
+    guest는 non-null Boolean 필드가 없다 — Event.active와 달리 "_boolean" 이슈 없음.
+    visit_at/created_at: DATETIME ↔ java.time.Instant(InstantTypeHandler 자동 등록, Event와 동일).
+-->
+<mapper namespace="kr.co.morymaker.api.persistence.mapper.GuestMapper">
+
+    <resultMap id="BaseResultMap" type="kr.co.morymaker.api.domain.guest.Guest">
+        <constructor>
+            <idArg column="id"            javaType="String"/>
+            <arg   column="event_id"      javaType="String"/>
+            <arg   column="name"          javaType="String"/>
+            <arg   column="org"           javaType="String"/>
+            <arg   column="title"         javaType="String"/>
+            <arg   column="phone"         javaType="String"/>
+            <arg   column="plate"         javaType="String"/>
+            <arg   column="seat_group_id" javaType="String"/>
+            <arg   column="status"        javaType="String"/>
+            <arg   column="src"           javaType="String"/>
+            <arg   column="visit_at"      javaType="java.time.Instant"/>
+            <arg   column="token"         javaType="String"/>
+            <arg   column="created_at"    javaType="java.time.Instant"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="DetailResultMap" type="kr.co.morymaker.api.application.port.out.GuestListItem">
+        <constructor>
+            <idArg column="id"            javaType="String"/>
+            <arg   column="event_id"      javaType="String"/>
+            <arg   column="name"          javaType="String"/>
+            <arg   column="org"           javaType="String"/>
+            <arg   column="title"         javaType="String"/>
+            <arg   column="phone"         javaType="String"/>
+            <arg   column="plate"         javaType="String"/>
+            <arg   column="seat_group_id" javaType="String"/>
+            <arg   column="status"        javaType="String"/>
+            <arg   column="src"           javaType="String"/>
+            <arg   column="visit_at"      javaType="java.time.Instant"/>
+            <arg   column="token"         javaType="String"/>
+            <arg   column="created_at"    javaType="java.time.Instant"/>
+            <arg   column="seat_label"    javaType="String"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="columns">
+        g.id
+        , g.event_id
+        , g.name
+        , g.org
+        , g.title
+        , g.phone
+        , g.plate
+        , g.seat_group_id
+        , g.status
+        , g.src
+        , g.visit_at
+        , g.token
+        , g.created_at
+    </sql>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT
+            <include refid="columns"/>
+        FROM guest g
+        WHERE g.event_id = #{eventId}
+          AND g.id = #{gid}
+    </select>
+
+    <!--
+        seat_label 실좌석 승격(§12-6, T-A07) — sg(그룹)는 라벨 소스로 유지, 신규 sa(좌석)는 ord만
+        결합한다. 조인 키에 sa.seat_group_id = g.seat_group_id를 포함해 sg와 sa가 같은 그룹일
+        때만 ord가 붙는다 — 라벨·번호 소스 불일치(예: H그룹 라벨 + G그룹 번호)를 원천 차단한다.
+        uq_seatassign_guest(guest_id) UNIQUE(V3)가 "그룹당 sa 매칭 ≤1"을 보장하므로 fan-out(명단
+        행 중복)이 없다.
+    -->
+    <select id="selectDetailById" resultMap="DetailResultMap">
+        SELECT
+            <include refid="columns"/>
+            , CASE
+                WHEN sg.id IS NULL THEN NULL
+                WHEN sg.numbering = 1 AND sa.ord IS NOT NULL THEN CONCAT(sg.label, ' ', sa.ord, '번')
+                ELSE sg.label
+              END AS seat_label
+        FROM guest g
+        LEFT JOIN seat_group sg ON g.seat_group_id = sg.id AND sg.event_id = g.event_id
+        LEFT JOIN seat_assignment sa ON sa.guest_id = g.id AND sa.seat_group_id = g.seat_group_id AND sa.event_id = g.event_id
+        WHERE g.event_id = #{eventId}
+          AND g.id = #{gid}
+    </select>
+
+    <select id="selectDetailByToken" resultMap="DetailResultMap">
+        SELECT
+            <include refid="columns"/>
+            , CASE
+                WHEN sg.id IS NULL THEN NULL
+                WHEN sg.numbering = 1 AND sa.ord IS NOT NULL THEN CONCAT(sg.label, ' ', sa.ord, '번')
+                ELSE sg.label
+              END AS seat_label
+        FROM guest g
+        LEFT JOIN seat_group sg ON g.seat_group_id = sg.id AND sg.event_id = g.event_id
+        LEFT JOIN seat_assignment sa ON sa.guest_id = g.id AND sa.seat_group_id = g.seat_group_id AND sa.event_id = g.event_id
+        WHERE g.event_id = #{eventId}
+          AND g.token = #{token}
+    </select>
+
+    <!--
+        공개(비로그인) 경로 전용 — event_id 조건 없이 token 단독으로 조회한다. token은
+        uk_guest_token UNIQUE라 전역에서 최대 1건만 매칭되며, 이 쿼리 자체가 이미 인가(공개
+        경로는 행사 스코프 가드를 호출하지 않고 token capability 유효성 검증으로 대체한다)의
+        실행 지점이다. sa 조인의 sa.event_id = g.event_id가 event_id 조건 부재를 스코프한다.
+    -->
+    <select id="selectDetailByGlobalToken" resultMap="DetailResultMap">
+        SELECT
+            <include refid="columns"/>
+            , CASE
+                WHEN sg.id IS NULL THEN NULL
+                WHEN sg.numbering = 1 AND sa.ord IS NOT NULL THEN CONCAT(sg.label, ' ', sa.ord, '번')
+                ELSE sg.label
+              END AS seat_label
+        FROM guest g
+        LEFT JOIN seat_group sg ON g.seat_group_id = sg.id AND sg.event_id = g.event_id
+        LEFT JOIN seat_assignment sa ON sa.guest_id = g.id AND sa.seat_group_id = g.seat_group_id AND sa.event_id = g.event_id
+        WHERE g.token = #{token}
+    </select>
+
+    <!--
+        목록/검색(§4-1·§4-9). 취소자는 기본 제외(liveGuests — includeCancelled=false).
+        q는 중간일치(name LIKE '%q%') — 02-architect §7 DB 건전성 판정: event_id 선두 조건으로
+        해당 행사만 스캔하므로 VIP 수백 규모에서는 실질 영향 낮음(만 명 이상 시 재검토).
+    -->
+    <select id="search" resultMap="DetailResultMap">
+        SELECT
+            <include refid="columns"/>
+            , CASE
+                WHEN sg.id IS NULL THEN NULL
+                WHEN sg.numbering = 1 AND sa.ord IS NOT NULL THEN CONCAT(sg.label, ' ', sa.ord, '번')
+                ELSE sg.label
+              END AS seat_label
+        FROM guest g
+        LEFT JOIN seat_group sg ON g.seat_group_id = sg.id AND sg.event_id = g.event_id
+        LEFT JOIN seat_assignment sa ON sa.guest_id = g.id AND sa.seat_group_id = g.seat_group_id AND sa.event_id = g.event_id
+        WHERE g.event_id = #{eventId}
+        <if test="!query.includeCancelled">
+            AND g.status != '취소'
+        </if>
+        <if test="query.status != null">
+            AND g.status = #{query.status}
+        </if>
+        <if test="query.src != null">
+            AND g.src = #{query.src}
+        </if>
+        <if test="query.q != null and query.q != ''">
+            AND g.name LIKE CONCAT('%', #{query.q}, '%')
+        </if>
+        ORDER BY g.created_at DESC
+        <if test="query.paging">
+            LIMIT #{query.pageSize} OFFSET #{query.offset}
+        </if>
+    </select>
+
+    <select id="countSearch" resultType="int">
+        SELECT COUNT(*)
+        FROM guest g
+        WHERE g.event_id = #{eventId}
+        <if test="!query.includeCancelled">
+            AND g.status != '취소'
+        </if>
+        <if test="query.status != null">
+            AND g.status = #{query.status}
+        </if>
+        <if test="query.src != null">
+            AND g.src = #{query.src}
+        </if>
+        <if test="query.q != null and query.q != ''">
+            AND g.name LIKE CONCAT('%', #{query.q}, '%')
+        </if>
+    </select>
+
+    <select id="existsByToken" resultType="boolean">
+        SELECT EXISTS(SELECT 1 FROM guest WHERE token = #{token})
+    </select>
+
+    <insert id="insert" parameterType="kr.co.morymaker.api.domain.guest.Guest">
+        INSERT INTO guest (
+            id
+            , event_id
+            , name
+            , org
+            , title
+            , phone
+            , plate
+            , seat_group_id
+            , status
+            , src
+            , visit_at
+            , token
+            , created_at
+        ) VALUES (
+            #{id}
+            , #{eventId}
+            , #{name}
+            , #{org}
+            , #{title}
+            , #{phone}
+            , #{plate}
+            , #{seatGroupId}
+            , #{status}
+            , #{src}
+            , #{visitAt}
+            , #{token}
+            , #{createdAt}
+        )
+    </insert>
+
+    <!-- 전 필드 update(CRUD·상태전이 공용). token·created_at은 발급 시점 고정값이라 갱신 대상 아님. -->
+    <update id="update" parameterType="kr.co.morymaker.api.domain.guest.Guest">
+        UPDATE guest
+           SET  name          = #{name}
+              , org           = #{org}
+              , title         = #{title}
+              , phone         = #{phone}
+              , plate         = #{plate}
+              , seat_group_id = #{seatGroupId}
+              , status        = #{status}
+              , src           = #{src}
+              , visit_at      = #{visitAt}
+         WHERE id = #{id}
+           AND event_id = #{eventId}
+    </update>
+
+    <!-- ➕ §6 신규 — parking→guest 매핑(3-7, P3) 조회·전이. 기존 쿼리·resultMap은 미접촉(additive만). -->
+
+    <!-- plate 완전일치(공백 정규화) 활성 참석자 조회 — 취소자 제외. -->
+    <select id="selectActiveByPlate" resultMap="BaseResultMap">
+        SELECT
+            <include refid="columns"/>
+        FROM guest g
+        WHERE g.event_id = #{eventId}
+          AND REPLACE(g.plate, ' ', '') = #{plate}
+          AND g.status != '취소'
+        LIMIT 1
+    </select>
+
+    <!-- phone 완전일치 활성 참석자 조회(plate 매칭 실패 시 보조) — 취소자 제외. -->
+    <select id="selectActiveByPhone" resultMap="BaseResultMap">
+        SELECT
+            <include refid="columns"/>
+        FROM guest g
+        WHERE g.event_id = #{eventId}
+          AND g.phone = #{phone}
+          AND g.status != '취소'
+        LIMIT 1
+    </select>
+
+    <!--
+        대기→방문 가드 전이 — 대기 상태가 아니면 WHERE에서 걸러져 영향 0행(멱등). event_id 조건은
+        cross-event 격리 방어심층(belt-and-suspenders) — 서비스가 이미 event 스코프 gid만 넘기므로
+        정상 케이스 동작은 불변이고, 위조된 타 행사 gid만 신규로 0행 매칭되어 차단된다.
+    -->
+    <update id="markVisitedIfWaiting">
+        UPDATE guest
+           SET status = '방문'
+             , visit_at = NOW()
+         WHERE id = #{gid}
+           AND event_id = #{eventId}
+           AND status = '대기'
+    </update>
+
+    <!--
+        조건부 체크인 전이(guestId 대상) — 대기·방문 어느 쪽에서 와도 참석으로 전이하되, 이미
+        참석 상태면 WHERE에서 걸러져 영향 0행(가드). affected rows를 서비스가 직접 읽어 "이 호출이
+        전이를 확정했는지"를 판정한다.
+
+        ⚠️ 호출 순서 계약 — 같은 트랜잭션에서 이 행을 먼저 SELECT한 뒤 호출하면 안 된다. MariaDB
+        InnoDB 스냅샷 격리(REPEATABLE READ)에서 먼저 읽어 스냅샷을 확정한 뒤 다른 트랜잭션이 그
+        사이 커밋 변경하면, 이어지는 UPDATE가 semi-consistent 재평가 없이 ER_CHECKREAD(1020)로
+        즉시 실패한다(SELECT FOR UPDATE의 갭락 데드락과 별개의 함정 — 실 DB 동시성 검증에서
+        재현). CheckinSupport는 이 UPDATE를 먼저 blind로 시도한 뒤에만 결과 조회를 한다.
+    -->
+    <update id="markAttendedIfNotAttended">
+        UPDATE guest
+           SET status = '참석'
+             , visit_at = #{visitAt}
+         WHERE id = #{gid}
+           AND event_id = #{eventId}
+           AND status != '참석'
+    </update>
+
+    <!-- 조건부 체크인 전이(token 대상) — markAttendedIfNotAttended와 동일 가드·동일 호출 순서 계약. -->
+    <update id="markAttendedIfNotAttendedByToken">
+        UPDATE guest
+           SET status = '참석'
+             , visit_at = #{visitAt}
+         WHERE token = #{token}
+           AND event_id = #{eventId}
+           AND status != '참석'
+    </update>
+
+    <!-- plate 백필 — 기존 값이 비어 있을 때만 갱신(가드). event_id 조건은 cross-event 격리 방어심층(위 markVisitedIfWaiting과 동일 근거). -->
+    <update id="backfillPlateIfEmpty">
+        UPDATE guest
+           SET plate = #{plate}
+         WHERE id = #{gid}
+           AND event_id = #{eventId}
+           AND (plate IS NULL OR plate = '')
+    </update>
+
+    <!-- ➕ §12 신규 — seat→guest 매핑(M1 payload 검증·M3 동기화). 기존 쿼리·resultMap은 미접촉(additive만). -->
+
+    <!-- event 소속 guestId만 필터링(§12-5 M1 payload 검증) — 존재하는 id만 되돌려준다. -->
+    <select id="selectExistingIds" resultType="string">
+        SELECT id
+        FROM guest
+        WHERE event_id = #{eventId}
+          AND id IN
+        <foreach collection="guestIds" item="gid" open="(" separator="," close=")">
+            #{gid}
+        </foreach>
+    </select>
+
+    <!-- guest.seat_group_id 일괄 갱신(§12-5 M3 동기화) — seatGroupId가 null이면 배정 해제. event_id 조건은 cross-event 격리 방어심층(위 markVisitedIfWaiting과 동일 근거). -->
+    <update id="updateSeatGroupId">
+        UPDATE guest
+           SET seat_group_id = #{seatGroupId}
+         WHERE event_id = #{eventId}
+           AND id IN
+        <foreach collection="guestIds" item="gid" open="(" separator="," close=")">
+            #{gid}
+        </foreach>
+    </update>
+
+</mapper>

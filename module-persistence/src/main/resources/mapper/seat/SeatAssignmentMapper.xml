@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+    SeatAssignmentMapper.xml — seat_assignment 테이블(1테이블1파일, §12 신설).
+
+    세 개의 <resultMap>을 쓴다:
+    - BaseResultMap(type=SeatAssignment) — 쓰기 대상 pure 도메인, 5컬럼.
+    - SlotRowResultMap(type=SeatSlotRow) — §12-4 조회 read model(guest 1:1 조인, guestName 포함).
+    - GuestGroupResultMap(type=GuestGroupRow) — §12-5 M1 assignedElsewhere 사전검사 전용.
+    각 <constructor> 선언 순서는 해당 클래스 주 생성자 파라미터 순서와 정확히 일치해야 한다
+    (positional index 금지 — 컬럼명 기반 명시 매핑이라 컬럼 순서 자체는 안전하지만 생성자 인자
+    개수·타입은 XML과 항상 짝을 맞춘다).
+
+    ⚠️ ord(INT→non-null Int)는 "_int" — ParkingRecordMapper.xml review_needed와 동일 원인(Kotlin
+    non-null 프리미티브 ↔ MyBatis 별칭 표 "_int"/"_boolean" 접두사 규칙).
+-->
+<mapper namespace="kr.co.morymaker.api.persistence.mapper.SeatAssignmentMapper">
+
+    <resultMap id="BaseResultMap" type="kr.co.morymaker.api.domain.seat.SeatAssignment">
+        <constructor>
+            <idArg column="id"            javaType="String"/>
+            <arg   column="event_id"      javaType="String"/>
+            <arg   column="seat_group_id" javaType="String"/>
+            <arg   column="ord"           javaType="_int"/>
+            <arg   column="guest_id"      javaType="String"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="SlotRowResultMap" type="kr.co.morymaker.api.application.port.out.SeatSlotRow">
+        <constructor>
+            <idArg column="id"         javaType="String"/>
+            <arg   column="ord"        javaType="_int"/>
+            <arg   column="guest_id"   javaType="String"/>
+            <arg   column="guest_name" javaType="String"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="GuestGroupResultMap" type="kr.co.morymaker.api.persistence.mapper.GuestGroupRow">
+        <constructor>
+            <arg column="guest_id"      javaType="String"/>
+            <arg column="seat_group_id" javaType="String"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="GroupCountsResultMap" type="kr.co.morymaker.api.application.port.out.SeatGroupCounts">
+        <constructor>
+            <arg column="seat_group_id"   javaType="String"/>
+            <arg column="slot_count"      javaType="_int"/>
+            <arg column="assigned_count"  javaType="_int"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="columns">
+        id
+        , event_id
+        , seat_group_id
+        , ord
+        , guest_id
+    </sql>
+
+    <!-- 그룹별 슬롯수(전체 행수)·배정수(guest_id≠null) 집계(§12-1). idx_seat_event가 커버. -->
+    <select id="countsByGroup" resultMap="GroupCountsResultMap">
+        SELECT seat_group_id, COUNT(*) AS slot_count, COUNT(guest_id) AS assigned_count
+        FROM seat_assignment
+        WHERE event_id = #{eventId}
+        GROUP BY seat_group_id
+    </select>
+
+    <!--
+        그룹 배정 조회(§12-4) — guest 1:1 조인(fan-out 없음, uq_seatassign_guest UNIQUE가 보장).
+        idx_seat_group(seat_group_id, ord)가 정렬 스캔을 커버한다. offset·limit이 null이면 전량
+        반환(§12-5 원자 교체 직후 최신 상태 echo 용도 — 대용량 자유석은 항상 page 호출).
+    -->
+    <select id="findByGroup" resultMap="SlotRowResultMap">
+        SELECT sa.id, sa.ord, sa.guest_id, g.name AS guest_name
+        FROM seat_assignment sa
+        LEFT JOIN guest g ON g.id = sa.guest_id
+        WHERE sa.event_id = #{eventId}
+          AND sa.seat_group_id = #{seatGroupId}
+        ORDER BY sa.ord ASC
+        <if test="limit != null">
+            LIMIT #{limit} OFFSET #{offset}
+        </if>
+    </select>
+
+    <select id="countByGroup" resultType="int">
+        SELECT COUNT(*)
+        FROM seat_assignment
+        WHERE event_id = #{eventId}
+          AND seat_group_id = #{seatGroupId}
+    </select>
+
+    <select id="findGuestIdsByGroup" resultType="string">
+        SELECT guest_id
+        FROM seat_assignment
+        WHERE seat_group_id = #{seatGroupId}
+          AND guest_id IS NOT NULL
+    </select>
+
+    <!-- cross-group 배정 조회(§12-5 M1 assignedElsewhere) — idx_seat_guest(구 idx, V3에서 uq_seatassign_guest로 대체)가 커버. -->
+    <select id="findGroupIdsByGuestIds" resultMap="GuestGroupResultMap">
+        SELECT guest_id, seat_group_id
+        FROM seat_assignment
+        WHERE event_id = #{eventId}
+          AND guest_id IN
+        <foreach collection="guestIds" item="gid" open="(" separator="," close=")">
+            #{gid}
+        </foreach>
+    </select>
+
+    <delete id="deleteByGroup">
+        DELETE FROM seat_assignment
+        WHERE event_id = #{eventId}
+          AND seat_group_id = #{seatGroupId}
+    </delete>
+
+    <insert id="insertBatch">
+        INSERT INTO seat_assignment (
+            id
+            , event_id
+            , seat_group_id
+            , ord
+            , guest_id
+        ) VALUES
+        <foreach collection="list" item="row" separator=",">
+        ( #{row.id}
+        , #{row.eventId}
+        , #{row.seatGroupId}
+        , #{row.ord}
+        , #{row.guestId}
+        )
+        </foreach>
+    </insert>
+
+    <!--
+        M4 ON→OFF 1단계 — 빈 좌석(번호만 점유, 미배정) 행 삭제. event_id는 직접 컬럼(V1
+        idx_seat_event)이라 JOIN 불요 — cross-event 격리 방어심층(위 deleteByGroup 선례와 동일 패턴).
+    -->
+    <delete id="deleteEmptySeats">
+        DELETE FROM seat_assignment
+        WHERE event_id = #{eventId}
+          AND seat_group_id = #{seatGroupId}
+          AND guest_id IS NULL
+    </delete>
+
+    <!-- M4 ON→OFF 2단계 — 남은 멤버(guest_id IS NOT NULL, 빈 좌석은 1단계에서 이미 삭제됨) ord 일괄 갱신. event_id는 cross-event 격리 방어심층. -->
+    <update id="updateOrdForGroup">
+        UPDATE seat_assignment
+           SET ord = #{ord}
+         WHERE event_id = #{eventId}
+           AND seat_group_id = #{seatGroupId}
+    </update>
+
+    <!-- M4 OFF→ON 1단계 — 재채번 순서 결정용 안정 정렬 조회(guest name 오름차순, 동명이인은 id로 tiebreak). -->
+    <select id="findMembersOrderedByGuestName" resultMap="BaseResultMap">
+        SELECT sa.id, sa.event_id, sa.seat_group_id, sa.ord, sa.guest_id
+        FROM seat_assignment sa
+        JOIN guest g ON g.id = sa.guest_id
+        WHERE sa.seat_group_id = #{seatGroupId}
+        ORDER BY g.name ASC, sa.id ASC
+    </select>
+
+    <!-- event_id는 직접 컬럼 — cross-event 격리 방어심층(deleteEmptySeats·updateOrdForGroup과 동일 패턴). -->
+    <update id="updateOrd">
+        UPDATE seat_assignment
+           SET ord = #{ord}
+         WHERE id = #{id}
+           AND event_id = #{eventId}
+    </update>
+
+</mapper>

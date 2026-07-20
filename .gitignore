@@ -182,3 +182,13 @@ local.properties
 
 # Claude Code 로컬 설정
 .claude/
+
+# 워크트리 docs 심볼릭 링크 (DOCS_PATH — 컨테이너 공유 docs, git 추적 대상 아님)
+/docs
+
+# 대기화면 미디어 로컬 저장소 (morymaker.media.root 기본값 — 서버 로컬 디스크, 컨테이너
+# 재생성 시 별도 볼륨 마운트 필요·업로드 실 파일은 git 추적 대상 아님).
+# 선행 슬래시(/var/)는 이 .gitignore 위치(레포 루트)에만 앵커되어 nested Gradle 모듈의
+# 실 저장 경로 api-app/var/ 를 놓쳤음 — **/var/ 로 모든 깊이의 var/ 를 봉인한다
+# (media.root 상대경로 기본값이 부팅 모듈 api-app 의 CWD 기준으로 해석되기 때문).
+**/var/

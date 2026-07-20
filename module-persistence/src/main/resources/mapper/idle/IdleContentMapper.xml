@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+    IdleContentMapper.xml — idle_content 테이블(1테이블1파일, §11-2~4 신설).
+
+    <constructor> 선언 순서는 IdleContent 주 생성자 파라미터 순서와 정확히 일치해야 한다:
+    (id, eventId, name, kind, mode, play, fileUrl, fileContentType, sortOrder).
+    positional index(번호로 컬럼을 꺼내는 방식) 금지 — 컬럼명 기반 명시 매핑(EventMapper·
+    ParkingZoneMapper와 동일 원칙).
+
+    ⚠️ sort_order의 <constructor> javaType은 "int"가 아니라 "_int"여야 한다. IdleContent.sortOrder
+    (Kotlin non-null Int)는 JVM 생성자 시그니처에서 프리미티브 int로 컴파일되는데, MyBatis 기본
+    별칭 표에서 "int"는 래퍼 타입(java.lang.Integer)에 매핑되고 프리미티브는 "_int" 접두사
+    별칭이 맡는다(ParkingZoneMapper.xml start_no/slot_count와 동일 원인).
+
+    file_content_type(V4 신설) — 대기화면 미디어 실 저장 도입으로 추가. fileUrl과
+    생멸을 같이한다(구 메타 전용 행은 둘 다 NULL, 신규 행은 둘 다 non-null).
+
+    createdAt 없음 — V1__init.sql idle_content 테이블에 해당 컬럼 자체가 없다(IdleContent
+    도메인도 무보유, Instant 핸들러 무관).
+-->
+<mapper namespace="kr.co.morymaker.api.persistence.mapper.IdleContentMapper">
+
+    <resultMap id="BaseResultMap" type="kr.co.morymaker.api.domain.idle.IdleContent">
+        <constructor>
+            <idArg column="id"                javaType="String"/>
+            <arg   column="event_id"          javaType="String"/>
+            <arg   column="name"              javaType="String"/>
+            <arg   column="kind"              javaType="String"/>
+            <arg   column="mode"              javaType="String"/>
+            <arg   column="play"              javaType="String"/>
+            <arg   column="file_url"          javaType="String"/>
+            <arg   column="file_content_type" javaType="String"/>
+            <arg   column="sort_order"        javaType="_int"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="columns">
+        id
+        , event_id
+        , name
+        , kind
+        , mode
+        , play
+        , file_url
+        , file_content_type
+        , sort_order
+    </sql>
+
+    <select id="findByEvent" resultMap="BaseResultMap">
+        SELECT
+            <include refid="columns"/>
+        FROM idle_content
+        WHERE event_id = #{eventId}
+        ORDER BY sort_order ASC
+    </select>
+
+    <select id="fetchById" resultMap="BaseResultMap">
+        SELECT
+            <include refid="columns"/>
+        FROM idle_content
+        WHERE event_id = #{eventId}
+          AND id = #{id}
+    </select>
+
+    <insert id="insert" parameterType="kr.co.morymaker.api.domain.idle.IdleContent">
+        INSERT INTO idle_content (
+            id
+            , event_id
+            , name
+            , kind
+            , mode
+            , play
+            , file_url
+            , file_content_type
+            , sort_order
+        ) VALUES (
+            #{id}
+            , #{eventId}
+            , #{name}
+            , #{kind}
+            , #{mode}
+            , #{play}
+            , #{fileUrl}
+            , #{fileContentType}
+            , #{sortOrder}
+        )
+    </insert>
+
+    <update id="update" parameterType="kr.co.morymaker.api.domain.idle.IdleContent">
+        UPDATE idle_content
+           SET  mode       = #{mode}
+              , play       = #{play}
+              , sort_order = #{sortOrder}
+         WHERE id = #{id}
+           AND event_id = #{eventId}
+    </update>
+
+    <delete id="delete">
+        DELETE FROM idle_content
+         WHERE id = #{id}
+           AND event_id = #{eventId}
+    </delete>
+
+</mapper>

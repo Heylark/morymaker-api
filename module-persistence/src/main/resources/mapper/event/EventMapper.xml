@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+    EventMapper.xml — event 테이블 (1테이블1파일).
+
+    <constructor> 선언 순서는 Event 주 생성자 파라미터 선언 순서와 정확히 일치해야 한다:
+    (id, name, eventDate, place, type, status, active, bgColor, pointColor, titleColor,
+     bodyColor, kv, defaultIdleMode, smsPolicy, createdAt).
+
+    update/updateBranding 2종은 물리적으로 다른 컬럼셋만 SET한다(저장 게이트 분리) —
+    update SQL에는 컬러4종·default_idle_mode 컬럼이 존재하지 않아 §2-4 PUT이 브랜딩을 SET하는
+    것이 구조적으로 불가능하다. kv는 두 경로 모두 SET 허용(스펙상 §2-4·§11-1 둘 다 kv 포함 — 게이트
+    대상은 컬러4종+default_idle_mode 뿐).
+
+    positional index(번호로 컬럼을 꺼내는 방식) 금지 — 컬럼 순서 변경 시 조용히 오매핑되므로 전 컬럼
+    컬럼명 기반 명시 매핑 (auth AccountMapper.xml과 동일 원칙).
+
+    ⚠️ active의 <constructor> javaType은 "boolean"이 아니라 "_boolean"이어야 한다. Event.active
+    (Kotlin non-null Boolean)는 JVM 생성자 시그니처에서 프리미티브 boolean으로 컴파일되는데,
+    MyBatis 기본 별칭 표에서 "boolean"은 래퍼 타입(java.lang.Boolean)에 매핑되고 프리미티브는
+    "_boolean" 접두사 별칭이 맡는다 — 그대로 두면 리플렉션 생성자 탐색이 실패한다(auth
+    AccountMapper.xml의 failed_attempts "_int" 사례와 동일 원인).
+
+    event_date/created_at: DATETIME ↔ java.time.Instant. MyBatis Spring Boot Starter가
+    InstantTypeHandler를 자동 등록해 매핑한다(consumed_refresh_tokens·account와 동일 원칙).
+
+    insert는 auth 저장소의 "개별 @Param 인자" 관례 대신 Event 객체 하나를 파라미터로 받는다 —
+    컬럼이 14개라 개별 인자로 나열하면 Kotlin 함수 시그니처와 XML #{} 참조 사이의 순서 정합을
+    수동으로 맞춰야 하는 위험이 커진다. #{propertyName}은 Event의 getter(id/name/... 프로퍼티가
+    생성하는 JavaBean getter)를 이름 기반으로 읽으므로 positional index 금지 원칙과 무관하게 안전하다.
+-->
+<mapper namespace="kr.co.morymaker.api.persistence.mapper.EventMapper">
+
+    <resultMap id="BaseResultMap" type="kr.co.morymaker.api.domain.event.Event">
+        <constructor>
+            <idArg column="id"          javaType="String"/>
+            <arg   column="name"        javaType="String"/>
+            <arg   column="event_date"  javaType="java.time.Instant"/>
+            <arg   column="place"       javaType="String"/>
+            <arg   column="type"        javaType="String"/>
+            <arg   column="status"      javaType="String"/>
+            <arg   column="active"      javaType="_boolean"/>
+            <arg   column="bg_color"    javaType="String"/>
+            <arg   column="point_color" javaType="String"/>
+            <arg   column="title_color" javaType="String"/>
+            <arg   column="body_color"  javaType="String"/>
+            <arg   column="kv"          javaType="String"/>
+            <arg   column="default_idle_mode" javaType="String"/>
+            <arg   column="sms_policy"  javaType="String"/>
+            <arg   column="created_at"  javaType="java.time.Instant"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="columns">
+        id
+        , name
+        , event_date
+        , place
+        , type
+        , status
+        , active
+        , bg_color
+        , point_color
+        , title_color
+        , body_color
+        , kv
+        , default_idle_mode
+        , sms_policy
+        , created_at
+    </sql>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT
+            <include refid="columns"/>
+        FROM event
+        WHERE id = #{id}
+    </select>
+
+    <!--
+        eventIds가 null이면 필터 없이 전체 조회(SYSTEM_ADMIN). 빈 리스트면 "IN ()" 같은 잘못된
+        SQL을 만들지 않도록 1=0으로 즉시 빈 결과(아직 담당 행사가 없는 계정 — 정상 상태).
+    -->
+    <select id="search" resultMap="BaseResultMap">
+        SELECT
+            <include refid="columns"/>
+        FROM event
+        <where>
+            <if test="eventIds != null">
+                <choose>
+                    <when test="eventIds.isEmpty()">
+                        AND 1 = 0
+                    </when>
+                    <otherwise>
+                        AND id IN
+                        <foreach collection="eventIds" item="eid" open="(" separator="," close=")">
+                            #{eid}
+                        </foreach>
+                    </otherwise>
+                </choose>
+            </if>
+        </where>
+        ORDER BY created_at DESC
+    </select>
+
+    <insert id="insert" parameterType="kr.co.morymaker.api.domain.event.Event">
+        INSERT INTO event (
+            id
+            , name
+            , event_date
+            , place
+            , type
+            , status
+            , active
+            , bg_color
+            , point_color
+            , title_color
+            , body_color
+            , kv
+            , default_idle_mode
+            , sms_policy
+            , created_at
+        ) VALUES (
+            #{id}
+            , #{name}
+            , #{eventDate}
+            , #{place}
+            , #{type}
+            , #{status}
+            , #{active}
+            , #{bgColor}
+            , #{pointColor}
+            , #{titleColor}
+            , #{bodyColor}
+            , #{kv}
+            , #{defaultIdleMode}
+            , #{smsPolicy}
+            , #{createdAt}
+        )
+    </insert>
+
+    <!--
+        update — §2-4 일반 필드 전용(저장 게이트). 컬러4종·default_idle_mode 컬럼은 이 SQL에
+        물리적으로 존재하지 않는다 — updateBranding 전용(교차 SET 0, 구조적 방어).
+    -->
+    <update id="update" parameterType="kr.co.morymaker.api.domain.event.Event">
+        UPDATE event
+           SET  name       = #{name}
+              , event_date = #{eventDate}
+              , place      = #{place}
+              , type       = #{type}
+              , kv         = #{kv}
+              , status     = #{status}
+              , active     = #{active}
+         WHERE id = #{id}
+    </update>
+
+    <!--
+        updateBranding — §11-1 브랜딩 명시 저장 게이트 전용. 컬러4종·kv·default_idle_mode만
+        SET한다 — name/event_date/place/type/status/active는 이 SQL에 존재하지 않는다.
+    -->
+    <update id="updateBranding" parameterType="kr.co.morymaker.api.domain.event.Event">
+        UPDATE event
+           SET  bg_color          = #{bgColor}
+              , point_color       = #{pointColor}
+              , title_color       = #{titleColor}
+              , body_color        = #{bodyColor}
+              , kv                = #{kv}
+              , default_idle_mode = #{defaultIdleMode}
+         WHERE id = #{id}
+    </update>
+
+</mapper>

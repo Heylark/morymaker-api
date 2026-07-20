@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+    StatsMapper.xml — 통계 집계 전용(§8, 신설). guest·parking_zone·parking_record를 읽기만
+    한다 — GuestMapper.xml/ParkingZoneMapper.xml/ParkingRecordMapper.xml은 0줄 변경(동결 경계,
+    02-architect §2).
+
+    전 쿼리 event_id 선두 + 취소자 제외(해당 시). count는 전부 COUNT(...)로 통일(BIGINT→Int,
+    countSearch 선례). <constructor> count 컬럼 javaType은 "int"가 아니라 "_int"여야 한다 —
+    Kotlin non-null Int는 JVM 생성자 시그니처에서 프리미티브 int로 컴파일되므로 MyBatis 기본
+    별칭(래퍼 Integer)이 아닌 프리미티브 별칭 "_int"로 매핑한다(ParkingRecord review_needed의
+    "_boolean" 이슈와 동일 원인).
+
+    timeline(참석)·arrivals(방문+참석)의 상태 필터 비대칭은 의도적이다 — timeline은 spec
+    "누적 체크인"(status=참석)을, arrivals는 spec "도착순"(visit_at 존재)을 각각 반영한다
+    (02-architect §5-4). 불일치로 오판 금지.
+-->
+<mapper namespace="kr.co.morymaker.api.persistence.mapper.StatsMapper">
+
+    <resultMap id="SrcRegistrationCountMap" type="kr.co.morymaker.api.application.port.out.SrcRegistrationCount">
+        <constructor>
+            <arg column="src"        javaType="String"/>
+            <arg column="registered" javaType="_int"/>
+            <arg column="attended"   javaType="_int"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="ZoneOccupancyMap" type="kr.co.morymaker.api.application.port.out.ZoneOccupancy">
+        <constructor>
+            <arg column="zone_id"       javaType="String"/>
+            <arg column="part1"         javaType="String"/>
+            <arg column="part2"         javaType="String"/>
+            <arg column="part3"         javaType="String"/>
+            <arg column="part4"         javaType="String"/>
+            <arg column="slot_count"    javaType="_int"/>
+            <arg column="occupied"      javaType="_int"/>
+            <arg column="review_needed" javaType="_int"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="TimelineBucketMap" type="kr.co.morymaker.api.application.port.out.TimelineBucket">
+        <constructor>
+            <arg column="bucket_key"   javaType="String"/>
+            <arg column="bucket_label" javaType="String"/>
+            <arg column="cnt"          javaType="_int"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="ArrivalItemMap" type="kr.co.morymaker.api.application.port.out.ArrivalItem">
+        <constructor>
+            <arg column="guest_id" javaType="String"/>
+            <arg column="name"     javaType="String"/>
+            <arg column="visit_at" javaType="String"/>
+        </constructor>
+    </resultMap>
+
+    <!-- registration + attendance(GROUP BY src) — 한 쿼리로 등록·실참석 동시. -->
+    <select id="countRegistrationBySrc" resultMap="SrcRegistrationCountMap">
+        SELECT g.src                                              AS src
+             , COUNT(*)                                           AS registered
+             , COUNT(CASE WHEN g.status = '참석' THEN 1 END)      AS attended
+        FROM guest g
+        WHERE g.event_id = #{eventId}
+          AND g.status != '취소'
+        GROUP BY g.src
+    </select>
+
+    <!-- parking byZone(GROUP BY zone_id) — 모든 구획 + 점유(활성 주차중 기준). -->
+    <select id="aggregateByZone" resultMap="ZoneOccupancyMap">
+        SELECT z.id                                                AS zone_id
+             , z.part1                                             AS part1
+             , z.part2                                             AS part2
+             , z.part3                                             AS part3
+             , z.part4                                             AS part4
+             , z.slot_count                                        AS slot_count
+             , COUNT(r.id)                                         AS occupied
+             , COUNT(CASE WHEN r.review_needed = 1 THEN 1 END)     AS review_needed
+        FROM parking_zone z
+        LEFT JOIN parking_record r
+               ON r.zone_id  = z.id
+              AND r.event_id = z.event_id
+              AND r.status   = '주차중'
+        WHERE z.event_id = #{eventId}
+        GROUP BY z.id, z.part1, z.part2, z.part3, z.part4, z.slot_count, z.created_at
+        ORDER BY z.created_at
+    </select>
+
+    <!-- timeline(GROUP BY 시간버킷) — S1 확정: 고정 시간(hour) 누적. "누적 체크인" = status=참석. -->
+    <select id="aggregateTimeline" resultMap="TimelineBucketMap">
+        SELECT DATE_FORMAT(g.visit_at, '%Y-%m-%d %H')             AS bucket_key
+             , DATE_FORMAT(g.visit_at, '%k시')                    AS bucket_label
+             , COUNT(*)                                           AS cnt
+        FROM guest g
+        WHERE g.event_id = #{eventId}
+          AND g.status = '참석'
+          AND g.visit_at IS NOT NULL
+        GROUP BY DATE_FORMAT(g.visit_at, '%Y-%m-%d %H')
+               , DATE_FORMAT(g.visit_at, '%k시')
+        ORDER BY bucket_key
+    </select>
+
+    <!-- arrivals(ORDER BY visit_at DESC) — 도착순. "도착" = visit_at 존재 + 취소 제외(방문+참석 포함). -->
+    <select id="selectArrivals" resultMap="ArrivalItemMap">
+        SELECT g.id                              AS guest_id
+             , g.name                            AS name
+             , DATE_FORMAT(g.visit_at, '%H:%i')  AS visit_at
+        FROM guest g
+        WHERE g.event_id = #{eventId}
+          AND g.status != '취소'
+          AND g.visit_at IS NOT NULL
+        ORDER BY g.visit_at DESC
+    </select>
+
+</mapper>
