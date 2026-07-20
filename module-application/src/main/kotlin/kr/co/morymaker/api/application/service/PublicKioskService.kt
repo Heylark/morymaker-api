@@ -60,6 +60,12 @@ internal class PublicKioskService(
         )
     }
 
+    // 신규 상태 정책을 두지 않고 fetchOpenEvent를 그대로 반환한다 — 무효 eid(404)·종료 행사(409)를
+    // 나머지 3 endpoint와 동일하게 거부한다. 브랜딩 자체는 개인정보가 아니지만, 종료된 행사의
+    // 브랜딩을 계속 노출하지 않도록 일관 정책을 유지한다(fail-open으로 폴백 색을 반환하지 않음).
+    @Transactional(readOnly = true)
+    override fun getBranding(eventId: String): Event = fetchOpenEvent(eventId)
+
     /** eid(=event.id) 존재 확인 + status 게이트(종료만 거부) — 3 엔드포인트 공통. */
     private fun fetchOpenEvent(eventId: String): Event {
         val event = eventPort.fetch(eventId) ?: throw NoSuchElementException("행사를 찾을 수 없습니다")

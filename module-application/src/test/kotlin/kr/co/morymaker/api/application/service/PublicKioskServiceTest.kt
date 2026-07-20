@@ -125,4 +125,32 @@ class PublicKioskServiceTest {
         assertEquals("1234", query.captured.plateTail)
         assertEquals(ParkingRecord.STATUS_PARKED, query.captured.status)
     }
+
+    // ── getBranding — fetchOpenEvent 게이트 재사용(신규 상태 정책 0) ──────────
+
+    @Test
+    fun `getBranding은 존재하고 운영중인 행사면 Event를 그대로 반환한다`() {
+        val expected = sampleEvent().withBranding(pointColor = "#123456", defaultIdleMode = "branded")
+        every { eventPort.fetch("ev1") } returns expected
+
+        val result = service.getBranding("ev1")
+
+        assertEquals(expected, result)
+        assertEquals("#123456", result.pointColor)
+        assertEquals("branded", result.defaultIdleMode)
+    }
+
+    @Test
+    fun `getBranding은 존재하지 않는 eid는 NoSuchElementException(404)을 던진다`() {
+        every { eventPort.fetch("ghost") } returns null
+
+        assertFailsWith<NoSuchElementException> { service.getBranding("ghost") }
+    }
+
+    @Test
+    fun `getBranding은 종료된 행사는 EventNotOpenException(409)을 던진다`() {
+        every { eventPort.fetch("ev1") } returns sampleEvent(status = Event.STATUS_CLOSED)
+
+        assertFailsWith<EventNotOpenException> { service.getBranding("ev1") }
+    }
 }
