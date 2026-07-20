@@ -1,5 +1,6 @@
 package kr.co.morymaker.api.application.port.`in`
 
+import kr.co.morymaker.api.domain.event.Event
 import kr.co.morymaker.api.domain.parking.ParkingRecord
 
 /**
@@ -21,4 +22,7 @@ interface PublicKioskUseCase {
 
     /** KIO-05 주차검색 — plateTail은 정확히 4자리 숫자 필수. 활성(주차중) 기록만. */
     fun searchParking(eventId: String, plateTail: String): List<ParkingRecord>
+
+    /** 공개 이벤트 브랜딩 조회 — pointColor·defaultIdleMode 노출용. fetchOpenEvent 게이트(무효 404·종료 409)를 공유. */
+    fun getBranding(eventId: String): Event
 }

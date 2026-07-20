@@ -13,8 +13,10 @@ import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequ
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.request.RequestPostProcessor
 import org.springframework.test.context.TestPropertySource
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.transaction.annotation.Transactional
@@ -65,6 +67,16 @@ class PublicKioskControllerTest(
 
     private fun closeEvent(eid: String) {
         jdbcTemplate.update("UPDATE event SET status = ? WHERE id = ?", "종료", eid)
+    }
+
+    /** 콘솔 브랜딩 저장(ADM-04, HAS_ADMIN_CONSOLE) — 브랜딩 조회 TC가 실 SQL 왕복으로 저장값을 세팅. */
+    private fun setBranding(eid: String, pointColor: String, defaultIdleMode: String) {
+        mockMvc.perform(
+            put("/events/$eid/branding")
+                .with(authenticatedAs(roles = listOf("SYSTEM_ADMIN")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"pointColor":"$pointColor","defaultIdleMode":"$defaultIdleMode"}"""),
+        ).andExpect(status().isOk)
     }
 
     private fun registerGuest(eid: String, name: String, plate: String? = null): String {
@@ -319,5 +331,72 @@ class PublicKioskControllerTest(
         mockMvc.perform(get("/public/events/$eidA/parking-search?plateTail=7777"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.length()").value(0))
+    }
+
+    // ── 브랜딩 조회 — 저장값 반영·cross-event 격리·fail-closed·캐시 정책 ──────────
+
+    @Test
+    fun `브랜딩 조회는 콘솔에 저장된 pointColor·defaultIdleMode를 그대로 반환한다`() {
+        val eid = createEvent()
+        setBranding(eid, "#ab12cd", "fullbleed")
+
+        mockMvc.perform(get("/public/events/$eid/branding"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.pointColor").value("#ab12cd"))
+            .andExpect(jsonPath("$.data.defaultIdleMode").value("fullbleed"))
+    }
+
+    @Test
+    fun `브랜딩 미설정 이벤트는 pointColor·defaultIdleMode를 null 필드로 반환한다(생략 아님)`() {
+        // jsonPath().exists()는 "키 존재"와 "값 null"을 구분하지 못해(Spring
+        // JsonPathExpectationsHelper가 null 평가 결과를 미존재로 취급) @JsonInclude 미부착
+        // 검증에 부적합 — 원문 바디에서 키 자체가 살아있는지 직접 확인한다(@JsonInclude
+        // 미부착이라 null 필드도 직렬화된다는 응답 계약을 검증).
+        val eid = createEvent()
+
+        mockMvc.perform(get("/public/events/$eid/branding"))
+            .andExpect(status().isOk)
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().string(org.hamcrest.Matchers.containsString("\"pointColor\":null")))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().string(org.hamcrest.Matchers.containsString("\"defaultIdleMode\":null")))
+    }
+
+    @Test
+    fun `타 행사의 브랜딩 색은 조회 결과에 노출되지 않는다(cross-event 격리)`() {
+        val eidA = createEvent("행사 A")
+        val eidB = createEvent("행사 B")
+        setBranding(eidA, "#111111", "branded")
+        setBranding(eidB, "#222222", "fullbleed")
+
+        mockMvc.perform(get("/public/events/$eidA/branding"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.pointColor").value("#111111"))
+            .andExpect(jsonPath("$.data.defaultIdleMode").value("branded"))
+    }
+
+    @Test
+    fun `존재하지 않는 eid로 브랜딩을 조회하면 404를 받는다`() {
+        mockMvc.perform(get("/public/events/${UUID.randomUUID()}/branding"))
+            .andExpect(status().isNotFound)
+    }
+
+    @Test
+    fun `종료된 행사의 브랜딩을 조회하면 409를 받는다`() {
+        val eid = createEvent()
+        closeEvent(eid)
+
+        mockMvc.perform(get("/public/events/$eid/branding"))
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.error.code").value("EVENT_CLOSED"))
+    }
+
+    @Test
+    fun `브랜딩 조회 응답은 no-cache 헤더를 명시하고 immutable 캐시를 사용하지 않는다`() {
+        val eid = createEvent()
+        setBranding(eid, "#abcdef", "branded")
+
+        mockMvc.perform(get("/public/events/$eid/branding"))
+            .andExpect(status().isOk)
+            .andExpect(header().string("Cache-Control", org.hamcrest.Matchers.containsString("no-cache")))
+            .andExpect(header().string("Cache-Control", org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("max-age=31536000"))))
     }
 }
