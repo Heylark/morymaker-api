@@ -59,6 +59,13 @@ RUN groupadd -r morymaker && useradd -r -g morymaker morymaker
 WORKDIR /app
 COPY --from=builder --chown=morymaker:morymaker /app/app.jar /app/app.jar
 
+# media 업로드 디렉토리를 비루트 소유로 미리 만들어 둔다 — WORKDIR(/app)은 root 소유라
+# 컨테이너 안에서 morymaker가 var/media를 새로 만들 권한이 없고, 이미지에 마운트포인트가
+# 없는 채로 fresh named volume을 붙이면 그 볼륨도 root:root로 생성돼 쓰기가 원리적으로
+# 막힌다(boot·헬스체크는 정상이라 업로드 시점까지 조용히 숨어 있는 실패). 이미지에 미리
+# morymaker 소유로 만들어 두면 docker가 fresh named volume에 이 소유권을 그대로 복사한다.
+RUN mkdir -p /app/var/media && chown -R morymaker:morymaker /app/var
+
 USER morymaker
 
 EXPOSE 30100
