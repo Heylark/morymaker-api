@@ -2,32 +2,41 @@ package kr.co.morymaker.api.web
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import kr.co.morymaker.api.config.SecurityConfig
+import org.apache.poi.xssf.usermodel.XSSFWorkbook
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
+import org.springframework.mock.web.MockMultipartFile
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.request.RequestPostProcessor
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.transaction.annotation.Transactional
+import java.io.ByteArrayOutputStream
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * 참석자 명단 API(§4) 통합 테스트 — cross-tenant 격리(EventScopeGuard)·ApiResponse meta 확장
- * 회귀(D4)·부분 갱신·취소 보존·이름검색 3상태(§4-9)를 실 MariaDB로 검증한다.
+ * 회귀(D4)·부분 갱신·취소 보존·이름검색 3상태(§4-9)·업로드 양식 다운로드(§4-5, ADR-005)·헤더
+ * 불일치 응답 계약(§4-5 V5, ADR-004)을 실 MariaDB로 검증한다.
  *
  * `EventControllerTest`와 동일 컨벤션 — `.with(jwt())`로 SecurityContext에 직접 인증 주체를
  * 주입(디코더·JWKS 미경유), `@Transactional`로 테스트 종료 시 자동 롤백.
  *
- * 엑셀 병합(§4-5·4-6, D1 매칭키·부분 실패 롤백)은 `GuestImportIntegrationTest`가 서비스 계층을
- * 직접 호출해 검증한다(MultipartFile 파싱은 여기서 다루지 않음).
+ * 엑셀 병합의 매칭키·부분 실패 롤백(§4-5·4-6, D1)은 `GuestImportIntegrationTest`가 서비스 계층을
+ * 직접 호출해 검증한다 — 이 파일의 multipart 테스트는 헤더 계약 위반의 HTTP 응답 코드만 확인하고
+ * 정상 파싱 이후의 매칭·병합 로직은 다루지 않는다. 헤더 대조 규칙(V1~V5) 자체·round-trip은
+ * `GuestExcelParserTest`·`GuestImportTemplateWriterTest`(단위 테스트, MockMvc 미경유).
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -302,5 +311,100 @@ class GuestControllerTest(
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data[0].seatLabel").doesNotExist())
+    }
+
+    // ── 업로드 양식 다운로드(§4-5, ADR-005) ────────────────────────────
+
+    @Test
+    fun `업로드 양식 다운로드는 xlsx Content-Type과 첨부 파일명을 반환한다`() {
+        val eid = createEvent()
+
+        val result = mockMvc.perform(
+            get("/events/$eid/guests/import/template")
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
+        )
+            .andExpect(status().isOk)
+            .andReturn()
+
+        assertEquals(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            result.response.contentType,
+        )
+        val disposition = result.response.getHeader("Content-Disposition")
+        assertTrue(disposition!!.contains("filename*=UTF-8''"), "RFC 5987 한글 파일명 인코딩이어야 한다")
+    }
+
+    @Test
+    fun `EVENT_ADMIN이 담당 아닌 행사의 업로드 양식을 요청하면 403 EVENT_FORBIDDEN을 받는다`() {
+        val eid = createEvent()
+
+        mockMvc.perform(
+            get("/events/$eid/guests/import/template")
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf("다른-행사-id"))),
+        )
+            .andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.error.code").value("EVENT_FORBIDDEN"))
+    }
+
+    @Test
+    fun `EVENT_STAFF는 업로드 양식 다운로드에서 403 ROLE_FORBIDDEN을 받는다(관리자 콘솔 전용)`() {
+        val eid = createEvent()
+
+        mockMvc.perform(
+            get("/events/$eid/guests/import/template")
+                .with(authenticatedAs(roles = listOf("EVENT_STAFF"), eventIds = listOf(eid))),
+        )
+            .andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.error.code").value("ROLE_FORBIDDEN"))
+    }
+
+    // ── 헤더 불일치 응답 계약(§4-5 V5, ADR-004) — preview·confirm 양쪽 동일 차단 ──
+
+    /** 00-research 발견 2 재현 — 연번 열 1개가 앞에 끼어들어 계약 6열이 모두 한 칸씩 밀린 파일. */
+    private fun mismatchedHeaderFile(): MockMultipartFile {
+        XSSFWorkbook().use { wb ->
+            val sheet = wb.createSheet("시트")
+            val header = sheet.createRow(0)
+            listOf("No.", "이름", "소속", "직함", "연락처", "차량번호")
+                .forEachIndexed { i, v -> header.createCell(i).setCellValue(v) }
+            val data = sheet.createRow(1)
+            listOf("1", "김진우", "모리메이커", "대표이사", "010-1234-5678", "12가3456")
+                .forEachIndexed { i, v -> data.createCell(i).setCellValue(v) }
+            ByteArrayOutputStream().use { bos ->
+                wb.write(bos)
+                return MockMultipartFile(
+                    "file",
+                    "명단.xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    bos.toByteArray(),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `헤더 어긋난 파일을 미리보기에 올리면 400 IMPORT_HEADER_MISMATCH를 받는다`() {
+        val eid = createEvent()
+
+        mockMvc.perform(
+            multipart("/events/$eid/guests/import/preview")
+                .file(mismatchedHeaderFile())
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.error.code").value("IMPORT_HEADER_MISMATCH"))
+    }
+
+    @Test
+    fun `헤더 어긋난 파일을 확정 업로드에 올리면 400 IMPORT_HEADER_MISMATCH를 받는다`() {
+        val eid = createEvent()
+
+        mockMvc.perform(
+            multipart("/events/$eid/guests/import")
+                .file(mismatchedHeaderFile())
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.error.code").value("IMPORT_HEADER_MISMATCH"))
     }
 }
