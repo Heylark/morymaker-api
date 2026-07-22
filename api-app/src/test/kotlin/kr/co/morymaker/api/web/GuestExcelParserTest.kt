@@ -13,6 +13,7 @@ import org.springframework.mock.web.MockMultipartFile
 import org.springframework.web.multipart.MultipartFile
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.FilterInputStream
 import java.io.IOException
 import java.io.InputStream
 import kotlin.test.assertEquals
@@ -94,6 +95,42 @@ class GuestExcelParserTest {
         override fun getSize() = 1L
         override fun getBytes(): ByteArray = throw IOException("임시 파일을 읽을 수 없습니다")
         override fun getInputStream(): InputStream = throw IOException("임시 파일을 열 수 없습니다")
+        override fun transferTo(dest: java.io.File) = throw UnsupportedOperationException()
+    }
+
+    /**
+     * 업로드 스트림이 실제로 닫히는지 세는 스텁 — 파서에 넘긴 뒤 close 호출 횟수를 읽는다.
+     *
+     * mark를 지원하지 않게 만든 것은 의도적이다. 운영은 업로드를 디스크로 스풀하도록 설정돼 있어
+     * 파일 스트림이 오고 그 스트림은 mark를 지원하지 않는데, 라이브러리는 지원 여부에 따라 서로 다른
+     * 내부 경로를 탄다. 관행대로 메모리 스트림을 그대로 쓰면 운영이 실제로는 지나가지 않는 길만
+     * 검증하게 된다.
+     */
+    private class CloseCountingMultipartFile(private val bytes: ByteArray) : MultipartFile {
+
+        var closeCount: Int = 0
+            private set
+
+        private val stream: InputStream =
+            object : FilterInputStream(ByteArrayInputStream(bytes)) {
+                override fun markSupported(): Boolean = false
+
+                override fun close() {
+                    closeCount++
+                    super.close()
+                }
+            }
+
+        override fun getName(): String = "file"
+        override fun getOriginalFilename(): String = "명단.xlsx"
+        override fun getContentType(): String = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        override fun isEmpty(): Boolean = bytes.isEmpty()
+        override fun getSize(): Long = bytes.size.toLong()
+        override fun getBytes(): ByteArray = bytes
+
+        // 파서는 스트림을 한 번만 요청한다. 같은 인스턴스를 돌려줘 호출 횟수가 흩어지지 않게 한다.
+        override fun getInputStream(): InputStream = stream
+
         override fun transferTo(dest: java.io.File) = throw UnsupportedOperationException()
     }
 
@@ -255,5 +292,54 @@ class GuestExcelParserTest {
         assertFailsWith<IOException> {
             GuestExcelParser.parse(unopenableFile())
         }
+    }
+
+    // ── 업로드 스트림 정리 ─────────────────────────────
+
+    @Test
+    fun `엑셀이 아닌 바이트로 열기가 실패해도 업로드 스트림은 닫힌다`() {
+        val stub = CloseCountingMultipartFile("이것은 엑셀 파일이 아닙니다".toByteArray())
+
+        assertFailsWith<GuestImportFileUnreadableException> { GuestExcelParser.parse(stub) }
+
+        assertTrue(stub.closeCount >= 1, "손상 파일 실패 경로에서도 업로드 스트림은 닫혀야 한다")
+    }
+
+    @Test
+    fun `0바이트로 열기가 실패해도 업로드 스트림은 닫힌다`() {
+        // 0바이트가 던지는 IllegalArgumentException 계열은 openWorkbook의 두 catch 어디에도 걸리지 않고
+        // 번역되지 않은 채 그대로 지나가는 실패다 — 정리를 catch 안이 아니라 스트림 자체에 둔 이유가
+        // 바로 이 케이스다. 정리를 catch에 두는 방식이었다면 이 케이스에서는 닫히지 않는다.
+        val stub = CloseCountingMultipartFile(ByteArray(0))
+
+        assertFailsWith<IllegalArgumentException> { GuestExcelParser.parse(stub) }
+
+        assertTrue(stub.closeCount >= 1, "번역되지 않고 지나가는 실패에서도 업로드 스트림은 닫혀야 한다")
+    }
+
+    @Test
+    fun `암호가 걸린 파일로 열기가 실패해도 업로드 스트림은 닫힌다`() {
+        val stub = CloseCountingMultipartFile(passwordProtectedBytes())
+
+        assertFailsWith<GuestImportFilePasswordProtectedException> { GuestExcelParser.parse(stub) }
+
+        assertTrue(stub.closeCount >= 1, "암호 보호 실패 경로에서도 업로드 스트림은 닫혀 있어야 한다")
+    }
+
+    @Test
+    fun `정상 파일은 그대로 파싱되고 중복 close로 깨지지 않는다`() {
+        val bytes = workbookBytes { sheet ->
+            fillRow(sheet.createRow(0), *standardHeaders)
+            fillRow(sheet.createRow(1), "김진우", "모리메이커", "대표이사", "010-1234-5678", "12가3456", "A열")
+        }
+        val stub = CloseCountingMultipartFile(bytes)
+
+        val rows = GuestExcelParser.parse(stub)
+
+        // 닫힌 스트림 뒤에 실제 셀 값을 대조한다 — 예외가 안 났다는 사실만으로는 지연 읽기 회귀를 놓친다.
+        assertEquals(1, rows.size)
+        assertEquals("김진우", rows[0].name)
+        assertEquals("A열", rows[0].seatGroupLabel)
+        assertTrue(stub.closeCount >= 1, "정상 파싱 후에도 업로드 스트림은 닫혀 있어야 한다(중복 close는 허용)")
     }
 }
