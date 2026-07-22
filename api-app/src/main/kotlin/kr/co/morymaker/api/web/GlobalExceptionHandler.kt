@@ -113,6 +113,13 @@ class GlobalExceptionHandler {
         ResponseEntity.status(HttpStatus.CONFLICT)
             .body(ErrorBody(ErrorDetail("SMS_SEND_BLOCKED", e.message ?: "발송할 수 없는 참석자가 있습니다")))
 
+    // 업로드 엑셀 머리글이 양식과 다름(§4-5) — GuestExcelParser가 데이터 행을 읽기 전에 던진다.
+    // 메시지에 어긋난 칸이 담겨 있어 web이 그대로 노출한다(전용 code로 안내 UI를 분기).
+    @ExceptionHandler(GuestImportHeaderMismatchException::class)
+    fun handleImportHeaderMismatch(e: GuestImportHeaderMismatchException): ResponseEntity<ErrorBody> =
+        ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            .body(ErrorBody(ErrorDetail("IMPORT_HEADER_MISMATCH", e.message ?: "엑셀 머리글을 확인해 주세요")))
+
     // 현장등록 공개 POST rate limit 초과 — PublicRateLimitInterceptor가 던진다.
     @ExceptionHandler(RateLimitExceededException::class)
     fun handleRateLimitExceeded(e: RateLimitExceededException): ResponseEntity<ErrorBody> =
