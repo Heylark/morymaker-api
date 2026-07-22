@@ -13,6 +13,7 @@ import org.springframework.mock.web.MockMultipartFile
 import org.springframework.web.multipart.MultipartFile
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.FilterInputStream
 import java.io.IOException
 import java.io.InputStream
 import kotlin.test.assertEquals
@@ -94,6 +95,49 @@ class GuestExcelParserTest {
         override fun getSize() = 1L
         override fun getBytes(): ByteArray = throw IOException("임시 파일을 읽을 수 없습니다")
         override fun getInputStream(): InputStream = throw IOException("임시 파일을 열 수 없습니다")
+        override fun transferTo(dest: java.io.File) = throw UnsupportedOperationException()
+    }
+
+    /**
+     * 업로드 스트림이 실제로 닫히는지 세는 스텁 — 파서에 넘긴 뒤 close 호출 횟수를 읽는다.
+     *
+     * mark를 지원하지 않게 만든 것은 의도적이다. 운영은 업로드를 디스크로 스풀하도록 설정돼 있어
+     * 파일 스트림이 오고 그 스트림은 mark를 지원하지 않는데, 라이브러리는 지원 여부에 따라 서로 다른
+     * 내부 경로를 탄다. 관행대로 메모리 스트림을 그대로 쓰면 운영이 실제로는 지나가지 않는 길만
+     * 검증하게 된다.
+     */
+    private class CloseCountingMultipartFile(
+        private val bytes: ByteArray,
+        private val failFromNthClose: Int = Int.MAX_VALUE,
+    ) : MultipartFile {
+
+        var closeCount: Int = 0
+            private set
+
+        private val stream: InputStream =
+            object : FilterInputStream(ByteArrayInputStream(bytes)) {
+                override fun markSupported(): Boolean = false
+
+                override fun close() {
+                    closeCount++
+                    // 몇 번째 close부터 실패할지 골라 둔 것은 라이브러리가 여는 도중에 하는 close와
+                    // 열기가 끝난 뒤의 정리 close를 따로 겨누기 위해서다. 기본값이면 아무것도 실패시키지
+                    // 않으므로 횟수만 세는 평범한 스텁으로 쓰인다.
+                    if (closeCount >= failFromNthClose) throw IOException("업로드 임시 파일을 닫지 못했습니다")
+                    super.close()
+                }
+            }
+
+        override fun getName(): String = "file"
+        override fun getOriginalFilename(): String = "명단.xlsx"
+        override fun getContentType(): String = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        override fun isEmpty(): Boolean = bytes.isEmpty()
+        override fun getSize(): Long = bytes.size.toLong()
+        override fun getBytes(): ByteArray = bytes
+
+        // 파서는 스트림을 한 번만 요청한다. 같은 인스턴스를 돌려줘 호출 횟수가 흩어지지 않게 한다.
+        override fun getInputStream(): InputStream = stream
+
         override fun transferTo(dest: java.io.File) = throw UnsupportedOperationException()
     }
 
@@ -255,5 +299,75 @@ class GuestExcelParserTest {
         assertFailsWith<IOException> {
             GuestExcelParser.parse(unopenableFile())
         }
+    }
+
+    // ── 업로드 스트림 정리 ─────────────────────────────
+
+    @Test
+    fun `엑셀이 아닌 바이트로 열기가 실패해도 업로드 스트림은 닫힌다`() {
+        val stub = CloseCountingMultipartFile("이것은 엑셀 파일이 아닙니다".toByteArray())
+
+        assertFailsWith<GuestImportFileUnreadableException> { GuestExcelParser.parse(stub) }
+
+        assertTrue(stub.closeCount >= 1, "손상 파일 실패 경로에서도 업로드 스트림은 닫혀야 한다")
+    }
+
+    @Test
+    fun `0바이트로 열기가 실패해도 업로드 스트림은 닫힌다`() {
+        // 0바이트가 던지는 IllegalArgumentException 계열은 openWorkbook의 두 catch 어디에도 걸리지 않고
+        // 번역되지 않은 채 그대로 지나가는 실패다 — 정리를 catch 안이 아니라 스트림 자체에 둔 이유가
+        // 바로 이 케이스다. 정리를 catch에 두는 방식이었다면 이 케이스에서는 닫히지 않는다.
+        val stub = CloseCountingMultipartFile(ByteArray(0))
+
+        assertFailsWith<IllegalArgumentException> { GuestExcelParser.parse(stub) }
+
+        assertTrue(stub.closeCount >= 1, "번역되지 않고 지나가는 실패에서도 업로드 스트림은 닫혀야 한다")
+    }
+
+    @Test
+    fun `암호가 걸린 파일로 열기가 실패해도 업로드 스트림은 닫힌다`() {
+        val stub = CloseCountingMultipartFile(passwordProtectedBytes())
+
+        assertFailsWith<GuestImportFilePasswordProtectedException> { GuestExcelParser.parse(stub) }
+
+        assertTrue(stub.closeCount >= 1, "암호 보호 실패 경로에서도 업로드 스트림은 닫혀 있어야 한다")
+    }
+
+    @Test
+    fun `정상 파일은 그대로 파싱되고 중복 close로 깨지지 않는다`() {
+        val bytes = workbookBytes { sheet ->
+            fillRow(sheet.createRow(0), *standardHeaders)
+            fillRow(sheet.createRow(1), "김진우", "모리메이커", "대표이사", "010-1234-5678", "12가3456", "A열")
+        }
+        val stub = CloseCountingMultipartFile(bytes)
+
+        val rows = GuestExcelParser.parse(stub)
+
+        // 닫힌 스트림 뒤에 실제 셀 값을 대조한다 — 예외가 안 났다는 사실만으로는 지연 읽기 회귀를 놓친다.
+        assertEquals(1, rows.size)
+        assertEquals("김진우", rows[0].name)
+        assertEquals("A열", rows[0].seatGroupLabel)
+        assertTrue(stub.closeCount >= 1, "정상 파싱 후에도 업로드 스트림은 닫혀 있어야 한다(중복 close는 허용)")
+    }
+
+    @Test
+    fun `열기가 끝난 뒤의 정리 실패는 파일 손상 안내로 번역되지 않는다`() {
+        // 정리를 어디에 두느냐가 아니라 정리와 번역 중 무엇이 바깥이냐를 고정하는 테스트다.
+        // 번역이 정리를 감싸도록 순서가 뒤집히면, 서버가 자기 임시 파일을 닫지 못한 사정이
+        // "당신 파일이 손상됐다"는 사용자 안내로 둔갑한다 — 이 파서가 없애려는 오분류와 같은 종류다.
+        // 뒤집혀도 스트림은 여전히 닫히기 때문에 close 횟수를 세는 위 테스트들은 전부 통과한다.
+        //
+        // 라이브러리가 여는 도중에 하는 close는 통과시키고 그 다음 정리 close만 실패시켜, 두 경계의
+        // 순서 하나만 겨눈다. 손상 안내 예외는 IOException이 아니므로 번역이 일어나면 이 기대가 깨진다.
+        val bytes = workbookBytes { sheet ->
+            fillRow(sheet.createRow(0), *standardHeaders)
+            fillRow(sheet.createRow(1), "김진우", "모리메이커", "대표이사", "010-1234-5678", "12가3456", "A열")
+        }
+
+        val thrown = assertFailsWith<IOException> {
+            GuestExcelParser.parse(CloseCountingMultipartFile(bytes, failFromNthClose = 2))
+        }
+
+        assertEquals("업로드 임시 파일을 닫지 못했습니다", thrown.message)
     }
 }
