@@ -524,4 +524,58 @@ class GuestControllerTest(
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.error.code").value("IMPORT_FILE_PASSWORD_PROTECTED"))
     }
+
+    // ── 업로드 미리보기·확정 인가 회귀 — 형제 엔드포인트(양식 다운로드)와 동일 가드 ──
+
+    @Test
+    fun `EVENT_ADMIN이 담당 아닌 행사의 명단을 미리보기에 올리면 403 EVENT_FORBIDDEN을 받는다`() {
+        val eid = createEvent()
+
+        mockMvc.perform(
+            multipart("/events/$eid/guests/import/preview")
+                .file(notAnExcelFile())
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf("다른-행사-id"))),
+        )
+            .andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.error.code").value("EVENT_FORBIDDEN"))
+    }
+
+    @Test
+    fun `EVENT_STAFF는 명단 미리보기에서 403 ROLE_FORBIDDEN을 받는다(관리자 콘솔 전용)`() {
+        val eid = createEvent()
+
+        mockMvc.perform(
+            multipart("/events/$eid/guests/import/preview")
+                .file(notAnExcelFile())
+                .with(authenticatedAs(roles = listOf("EVENT_STAFF"), eventIds = listOf(eid))),
+        )
+            .andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.error.code").value("ROLE_FORBIDDEN"))
+    }
+
+    @Test
+    fun `EVENT_ADMIN이 담당 아닌 행사의 명단을 확정 업로드하면 403 EVENT_FORBIDDEN을 받는다`() {
+        val eid = createEvent()
+
+        mockMvc.perform(
+            multipart("/events/$eid/guests/import")
+                .file(notAnExcelFile())
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf("다른-행사-id"))),
+        )
+            .andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.error.code").value("EVENT_FORBIDDEN"))
+    }
+
+    @Test
+    fun `EVENT_STAFF는 명단 확정 업로드에서 403 ROLE_FORBIDDEN을 받는다(관리자 콘솔 전용)`() {
+        val eid = createEvent()
+
+        mockMvc.perform(
+            multipart("/events/$eid/guests/import")
+                .file(notAnExcelFile())
+                .with(authenticatedAs(roles = listOf("EVENT_STAFF"), eventIds = listOf(eid))),
+        )
+            .andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.error.code").value("ROLE_FORBIDDEN"))
+    }
 }
