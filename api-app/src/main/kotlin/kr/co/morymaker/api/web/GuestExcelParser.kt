@@ -56,7 +56,7 @@ internal object GuestExcelParser {
         }
     }
 
-    /** 계약 6열만 대조한다. 7열 이후 추가 열은 A~F 위치를 밀지 않으므로 무시한다(V3). */
+    /** 계약 6열만 대조한다. 7열 이후 추가 열은 A~F 위치를 밀지 않으므로 무시한다. */
     private fun findHeaderMismatches(headerRow: Row?): List<ImportHeaderMismatch> =
         GuestImportColumn.entries.mapNotNull { column ->
             val actual = headerRow?.let { cellText(it, column.index) }

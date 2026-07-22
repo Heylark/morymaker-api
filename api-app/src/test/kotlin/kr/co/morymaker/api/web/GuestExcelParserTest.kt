@@ -12,14 +12,18 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * [GuestExcelParser] 헤더 검증(§4-5, V1~V5) 단위 테스트 — Spring 컨텍스트 없이 POI 워크북을
+ * [GuestExcelParser] 헤더 검증(§4-5) 단위 테스트 — Spring 컨텍스트 없이 POI 워크북을
  * 메모리에서 직접 만들어 검증한다(`IdleContentControllerTest`의 MockMultipartFile 선례와 동일
  * 발상이나, 이 파일은 HTTP 계층 없이 파서만 단독 호출한다).
  *
  * 실 DB 매칭·부분 실패 롤백은 `GuestImportIntegrationTest`(서비스 계층), cross-tenant·역할
  * 게이트·응답 계약(400 IMPORT_HEADER_MISMATCH)은 `GuestControllerTest`가 각각 검증한다 — 이
- * 파일은 헤더 대조 규칙(V1~V5) 자체에만 집중한다. R2(컬럼 계약 이중화 방지) round-trip은
+ * 파일은 헤더 대조 규칙 자체(정상 통과·연번 열 삽입 차단·빈 시트 차단·공백 관용·후행 열 무시)에만
+ * 집중한다. 생성한 양식을 파서에 되먹여 컬럼 계약이 갈라지지 않았음을 보는 round-trip은
  * `GuestImportTemplateWriterTest`.
+ *
+ * 기대 헤더 라벨을 [GuestImportColumn]에서 읽지 않고 아래 `standardHeaders`에 그대로 적어 둔 것은
+ * 의도적이다 — 프로덕션 정의를 그대로 참조하면 라벨이 바뀌어도 항상 통과하는 동어반복이 된다.
  */
 class GuestExcelParserTest {
 

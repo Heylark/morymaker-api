@@ -7,9 +7,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /**
- * [GuestImportTemplateWriter] 단위 테스트 — R2(컬럼 계약 이중화 방지)의 실질 가드는
- * round-trip이다. 컬럼 정의가 [GuestImportColumn] 밖으로 갈라지는 순간 이 테스트가 RED가
- * 된다(grep 검증은 ADR-001의 보조 수단일 뿐).
+ * [GuestImportTemplateWriter] 단위 테스트 — "템플릿이 알려준 열 순서"와 "파서가 읽는 열 순서"가
+ * 갈라지지 않음을 보장하는 실질 가드는 round-trip이다. 컬럼 정의가 [GuestImportColumn] 밖으로
+ * 갈라지는 순간 이 테스트가 RED가 된다(리터럴 재정의를 찾는 grep은 보조 수단일 뿐).
  */
 class GuestImportTemplateWriterTest {
 
@@ -31,7 +31,7 @@ class GuestImportTemplateWriterTest {
         assertEquals("홍길동(예시)", rows[0].name)
         assertEquals("모리메이커", rows[0].org)
         assertEquals("12가3456", rows[0].plate)
-        assertNull(rows[0].seatGroupLabel, "좌석그룹 예시값은 비워둔다(ADR-006 — 현재 저장 미반영 컬럼 유입 방지)")
+        assertNull(rows[0].seatGroupLabel, "좌석그룹 예시값은 비워둔다 — 현재 업로드로는 좌석이 배정되지 않아 유입시키지 않는다")
         assertEquals("김영희(예시)", rows[1].name)
         assertNull(rows[1].plate, "2번째 예시행은 선택 컬럼을 비워 '빈칸이어도 된다'를 보여준다")
     }

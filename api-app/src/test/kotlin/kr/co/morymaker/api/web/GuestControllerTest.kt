@@ -27,16 +27,17 @@ import kotlin.test.assertTrue
 
 /**
  * 참석자 명단 API(§4) 통합 테스트 — cross-tenant 격리(EventScopeGuard)·ApiResponse meta 확장
- * 회귀(D4)·부분 갱신·취소 보존·이름검색 3상태(§4-9)·업로드 양식 다운로드(§4-5, ADR-005)·헤더
- * 불일치 응답 계약(§4-5 V5, ADR-004)을 실 MariaDB로 검증한다.
+ * 회귀(D4)·부분 갱신·취소 보존·이름검색 3상태(§4-9)·업로드 양식 다운로드(§4-5)·헤더 불일치
+ * 응답 계약(§4-5 — 400 IMPORT_HEADER_MISMATCH)을 실 MariaDB로 검증한다.
  *
  * `EventControllerTest`와 동일 컨벤션 — `.with(jwt())`로 SecurityContext에 직접 인증 주체를
  * 주입(디코더·JWKS 미경유), `@Transactional`로 테스트 종료 시 자동 롤백.
  *
  * 엑셀 병합의 매칭키·부분 실패 롤백(§4-5·4-6, D1)은 `GuestImportIntegrationTest`가 서비스 계층을
  * 직접 호출해 검증한다 — 이 파일의 multipart 테스트는 헤더 계약 위반의 HTTP 응답 코드만 확인하고
- * 정상 파싱 이후의 매칭·병합 로직은 다루지 않는다. 헤더 대조 규칙(V1~V5) 자체·round-trip은
- * `GuestExcelParserTest`·`GuestImportTemplateWriterTest`(단위 테스트, MockMvc 미경유).
+ * 정상 파싱 이후의 매칭·병합 로직은 다루지 않는다. 헤더 대조 규칙 자체(공백 관용·후행 열 무시
+ * 등)와 양식 round-trip은 `GuestExcelParserTest`·`GuestImportTemplateWriterTest`(단위 테스트,
+ * MockMvc 미경유).
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -313,7 +314,7 @@ class GuestControllerTest(
             .andExpect(jsonPath("$.data[0].seatLabel").doesNotExist())
     }
 
-    // ── 업로드 양식 다운로드(§4-5, ADR-005) ────────────────────────────
+    // ── 업로드 양식 다운로드(§4-5) ────────────────────────────
 
     @Test
     fun `업로드 양식 다운로드는 xlsx Content-Type과 첨부 파일명을 반환한다`() {
@@ -372,7 +373,7 @@ class GuestControllerTest(
             .andExpect(status().isUnauthorized)
     }
 
-    // ── 헤더 불일치 응답 계약(§4-5 V5, ADR-004) — preview·confirm 양쪽 동일 차단 ──
+    // ── 헤더 불일치 응답 계약(§4-5) — preview·confirm 양쪽 동일 차단 ──
 
     /** 00-research 발견 2 재현 — 연번 열 1개가 앞에 끼어들어 계약 6열이 모두 한 칸씩 밀린 파일. */
     private fun mismatchedHeaderFile(): MockMultipartFile {

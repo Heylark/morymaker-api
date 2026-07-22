@@ -27,8 +27,8 @@ internal enum class GuestImportColumn(val header: String) {
         /** 헤더 행 인덱스. 데이터는 그다음 행부터. */
         const val HEADER_ROW_INDEX = 0
 
-        /** 비교·생성 공통 정규화 — 공백만 제거한다(V2 — 사람이 넣는 공백 차이로 차단하면 오탐이
-         * 실제 오염보다 잦아진다). */
+        /** 비교·생성 공통 정규화 — 공백만 제거한다. 사람이 넣는 공백 차이("차량 번호")로 차단하면
+         * 오탐이 실제 오염보다 잦아지기 때문이다. */
         fun normalize(raw: String?): String = raw?.filterNot { it.isWhitespace() } ?: ""
     }
 }

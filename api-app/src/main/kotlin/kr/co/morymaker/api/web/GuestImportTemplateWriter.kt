@@ -18,7 +18,7 @@ import java.io.ByteArrayOutputStream
  */
 internal object GuestImportTemplateWriter {
 
-    // A~F(계약 6열) 밖 — 파서·헤더 검증 모두 6열까지만 보므로(V3) 이 열은 무해하다.
+    // A~F(계약 6열) 밖 — 파서·헤더 검증 모두 6열까지만 보므로 이 열은 무해하다.
     private const val NOTE_COLUMN_INDEX = 7
     private const val NOTE_TEXT = "※ 아래 회색 예시 2행을 지우고 실제 명단을 입력해 주세요"
 
