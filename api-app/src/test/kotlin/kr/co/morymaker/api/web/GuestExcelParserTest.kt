@@ -1,13 +1,23 @@
 package kr.co.morymaker.api.web
 
+import org.apache.poi.EncryptedDocumentException
+import org.apache.poi.openxml4j.opc.OPCPackage
+import org.apache.poi.poifs.crypt.EncryptionInfo
+import org.apache.poi.poifs.crypt.EncryptionMode
+import org.apache.poi.poifs.filesystem.POIFSFileSystem
 import org.apache.poi.ss.usermodel.Row
 import org.apache.poi.ss.usermodel.Sheet
 import org.apache.poi.xssf.usermodel.XSSFWorkbook
 import org.junit.jupiter.api.Test
 import org.springframework.mock.web.MockMultipartFile
+import org.springframework.web.multipart.MultipartFile
+import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.IOException
+import java.io.InputStream
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -51,6 +61,41 @@ class GuestExcelParserTest {
     }
 
     private val standardHeaders = arrayOf("이름", "소속", "직함", "연락처", "차량번호", "좌석그룹")
+
+    /**
+     * 열기 암호가 걸린 워크북을 메모리에서 직접 만든다 — 신규 의존성 없이 현재 `api-app` 의존성
+     * (`poi-ooxml`)만으로 성립함을 실행으로 확인한 레시피다(agile 암호화 모드).
+     */
+    private fun passwordProtectedBytes(): ByteArray {
+        val plain = workbookBytes { sheet -> fillRow(sheet.createRow(0), *standardHeaders) }
+        POIFSFileSystem().use { fs ->
+            val info = EncryptionInfo(EncryptionMode.agile)
+            val encryptor = info.encryptor
+            encryptor.confirmPassword("morymaker")
+            OPCPackage.open(ByteArrayInputStream(plain)).use { opc ->
+                encryptor.getDataStream(fs).use { out -> opc.save(out) }
+            }
+            ByteArrayOutputStream().use { bos ->
+                fs.writeFilesystem(bos)
+                return bos.toByteArray()
+            }
+        }
+    }
+
+    /**
+     * 업로드 스트림 자체를 열 수 없는 상황을 흉내내는 스텁 — 서버가 자기 임시 파일을 읽지 못한
+     * 경우를 재현한다. 이 실패는 파일 내용과 무관하므로 번역되지 않고 그대로 전파돼야 한다.
+     */
+    private fun unopenableFile() = object : MultipartFile {
+        override fun getName() = "file"
+        override fun getOriginalFilename() = "명단.xlsx"
+        override fun getContentType() = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        override fun isEmpty() = false
+        override fun getSize() = 1L
+        override fun getBytes(): ByteArray = throw IOException("임시 파일을 읽을 수 없습니다")
+        override fun getInputStream(): InputStream = throw IOException("임시 파일을 열 수 없습니다")
+        override fun transferTo(dest: java.io.File) = throw UnsupportedOperationException()
+    }
 
     @Test
     fun `정규 헤더 + 2행은 기존과 동일한 GuestImportRow 2건으로 파싱된다`() {
@@ -142,5 +187,73 @@ class GuestExcelParserTest {
         assertEquals(1, rows.size)
         assertNull(rows[0].name)
         assertEquals("모리메이커", rows[0].org)
+    }
+
+    // ── 열지 못한 파일 번역(§4-5·§5) ─────────────────────────────
+
+    @Test
+    fun `엑셀이 아닌 바이트를 올리면 GuestImportFileUnreadableException으로 번역되고 원인은 IOException이다`() {
+        val bytes = "이것은 엑셀 파일이 아닙니다".toByteArray()
+
+        val exception = assertFailsWith<GuestImportFileUnreadableException> {
+            GuestExcelParser.parse(multipart(bytes))
+        }
+        assertTrue(exception.cause is IOException)
+    }
+
+    @Test
+    fun `암호가 걸린 워크북을 올리면 GuestImportFilePasswordProtectedException으로 번역되고 원인은 EncryptedDocumentException이다`() {
+        val exception = assertFailsWith<GuestImportFilePasswordProtectedException> {
+            GuestExcelParser.parse(multipart(passwordProtectedBytes()))
+        }
+        assertTrue(exception.cause is EncryptedDocumentException)
+    }
+
+    @Test
+    fun `손상 안내와 암호 안내는 문구를 공유하지 않는다`() {
+        val unreadable = assertFailsWith<GuestImportFileUnreadableException> {
+            GuestExcelParser.parse(multipart("이것은 엑셀 파일이 아닙니다".toByteArray()))
+        }
+        val passwordProtected = assertFailsWith<GuestImportFilePasswordProtectedException> {
+            GuestExcelParser.parse(multipart(passwordProtectedBytes()))
+        }
+
+        assertTrue(unreadable.message!!.contains("템플릿"), "손상 안내에는 템플릿 유도가 있어야 한다")
+        assertFalse(passwordProtected.message!!.contains("템플릿"), "암호 안내에는 템플릿 유도가 없어야 한다")
+        assertTrue(unreadable.message != passwordProtected.message, "두 안내 문구는 서로 달라야 한다")
+    }
+
+    @Test
+    fun `사용자 메시지에는 원인 예외 문구가 노출되지 않는다`() {
+        // 라이브러리 영문 진단 문구가 버전에 따라 바뀌더라도(§3-1 실측) cause.message 자체를
+        // 기준으로 검사하므로 동어반복이 되지 않는다.
+        val unreadable = assertFailsWith<GuestImportFileUnreadableException> {
+            GuestExcelParser.parse(multipart("이것은 엑셀 파일이 아닙니다".toByteArray()))
+        }
+        val passwordProtected = assertFailsWith<GuestImportFilePasswordProtectedException> {
+            GuestExcelParser.parse(multipart(passwordProtectedBytes()))
+        }
+
+        val unreadableCauseMessage = requireNotNull(unreadable.cause?.message) { "원인 예외 문구가 실측 대상이어야 한다" }
+        val passwordProtectedCauseMessage =
+            requireNotNull(passwordProtected.cause?.message) { "원인 예외 문구가 실측 대상이어야 한다" }
+        assertFalse(unreadable.message!!.contains(unreadableCauseMessage))
+        assertFalse(passwordProtected.message!!.contains(passwordProtectedCauseMessage))
+    }
+
+    @Test
+    fun `0바이트 파일은 기존과 동일하게 IllegalArgumentException 계열로 남는다`() {
+        // 신규 번역(IOException·EncryptedDocumentException)이 이 경로를 가로채지 않아야 한다.
+        assertFailsWith<IllegalArgumentException> {
+            GuestExcelParser.parse(multipart(ByteArray(0)))
+        }
+    }
+
+    @Test
+    fun `업로드 스트림 획득 자체가 실패하면 번역되지 않고 IOException이 그대로 전파된다`() {
+        // 경계 고정 — file.inputStream 실패는 서버 사정이라 사용자 파일 탓으로 번역하면 안 된다.
+        assertFailsWith<IOException> {
+            GuestExcelParser.parse(unopenableFile())
+        }
     }
 }
