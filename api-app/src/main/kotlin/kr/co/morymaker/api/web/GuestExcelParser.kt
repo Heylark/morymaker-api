@@ -70,15 +70,23 @@ internal object GuestExcelParser {
      *
      * 두 catch는 서로 겹치지 않는 타입이라 순서가 동작에 영향을 주지 않는다. 열 수 없는 이유가 다르면
      * 사용자가 해야 할 일도 다르므로(양식 다시 받기 ↔ 암호 해제) 예외를 하나로 합치지 않는다.
+     *
+     * 스트림을 use로 감싼 것은 오직 열기에 실패했을 때를 위해서다. 열기에 성공하면 라이브러리가 반환
+     * 직전에 스스로 닫으므로 여기의 close는 이미 닫힌 스트림을 한 번 더 닫는 무동작이 되지만, 실패하면
+     * 아무도 닫지 않아 디스크로 스풀된 임시 파일 핸들이 그대로 남는다. 정리를 아래 catch 안이 아니라
+     * 이 바깥 블록에 둔 이유는 열기 실패가 그 두 갈래로만 오지 않기 때문이다 — 빈 파일처럼 여기서
+     * 번역하지 않고 그대로 지나가는 실패도 스트림은 닫아야 한다.
      */
     private fun openWorkbook(file: MultipartFile): Workbook {
         val uploaded = file.inputStream
-        return try {
-            WorkbookFactory.create(uploaded)
-        } catch (e: IOException) {
-            throw GuestImportFileUnreadableException(e)
-        } catch (e: EncryptedDocumentException) {
-            throw GuestImportFilePasswordProtectedException(e)
+        return uploaded.use {
+            try {
+                WorkbookFactory.create(it)
+            } catch (e: IOException) {
+                throw GuestImportFileUnreadableException(e)
+            } catch (e: EncryptedDocumentException) {
+                throw GuestImportFilePasswordProtectedException(e)
+            }
         }
     }
 
