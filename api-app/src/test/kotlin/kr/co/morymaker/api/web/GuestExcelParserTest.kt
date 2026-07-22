@@ -106,7 +106,10 @@ class GuestExcelParserTest {
      * 내부 경로를 탄다. 관행대로 메모리 스트림을 그대로 쓰면 운영이 실제로는 지나가지 않는 길만
      * 검증하게 된다.
      */
-    private class CloseCountingMultipartFile(private val bytes: ByteArray) : MultipartFile {
+    private class CloseCountingMultipartFile(
+        private val bytes: ByteArray,
+        private val failFromNthClose: Int = Int.MAX_VALUE,
+    ) : MultipartFile {
 
         var closeCount: Int = 0
             private set
@@ -117,6 +120,10 @@ class GuestExcelParserTest {
 
                 override fun close() {
                     closeCount++
+                    // 몇 번째 close부터 실패할지 골라 둔 것은 라이브러리가 여는 도중에 하는 close와
+                    // 열기가 끝난 뒤의 정리 close를 따로 겨누기 위해서다. 기본값이면 아무것도 실패시키지
+                    // 않으므로 횟수만 세는 평범한 스텁으로 쓰인다.
+                    if (closeCount >= failFromNthClose) throw IOException("업로드 임시 파일을 닫지 못했습니다")
                     super.close()
                 }
             }
@@ -341,5 +348,26 @@ class GuestExcelParserTest {
         assertEquals("김진우", rows[0].name)
         assertEquals("A열", rows[0].seatGroupLabel)
         assertTrue(stub.closeCount >= 1, "정상 파싱 후에도 업로드 스트림은 닫혀 있어야 한다(중복 close는 허용)")
+    }
+
+    @Test
+    fun `열기가 끝난 뒤의 정리 실패는 파일 손상 안내로 번역되지 않는다`() {
+        // 정리를 어디에 두느냐가 아니라 정리와 번역 중 무엇이 바깥이냐를 고정하는 테스트다.
+        // 번역이 정리를 감싸도록 순서가 뒤집히면, 서버가 자기 임시 파일을 닫지 못한 사정이
+        // "당신 파일이 손상됐다"는 사용자 안내로 둔갑한다 — 이 파서가 없애려는 오분류와 같은 종류다.
+        // 뒤집혀도 스트림은 여전히 닫히기 때문에 close 횟수를 세는 위 테스트들은 전부 통과한다.
+        //
+        // 라이브러리가 여는 도중에 하는 close는 통과시키고 그 다음 정리 close만 실패시켜, 두 경계의
+        // 순서 하나만 겨눈다. 손상 안내 예외는 IOException이 아니므로 번역이 일어나면 이 기대가 깨진다.
+        val bytes = workbookBytes { sheet ->
+            fillRow(sheet.createRow(0), *standardHeaders)
+            fillRow(sheet.createRow(1), "김진우", "모리메이커", "대표이사", "010-1234-5678", "12가3456", "A열")
+        }
+
+        val thrown = assertFailsWith<IOException> {
+            GuestExcelParser.parse(CloseCountingMultipartFile(bytes, failFromNthClose = 2))
+        }
+
+        assertEquals("업로드 임시 파일을 닫지 못했습니다", thrown.message)
     }
 }
