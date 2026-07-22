@@ -120,6 +120,34 @@ class GlobalExceptionHandler {
         ResponseEntity.status(HttpStatus.BAD_REQUEST)
             .body(ErrorBody(ErrorDetail("IMPORT_HEADER_MISMATCH", e.message ?: "엑셀 머리글을 확인해 주세요")))
 
+    // 업로드된 파일을 엑셀로 열지 못함 — 파서가 워크북 생성 실패를 번역해 던진다. 매직바이트가 어긋난
+    // 파일(다른 형식을 확장자만 바꾼 경우 포함)은 라이브러리가 평범한 IOException을 던져 아래 catch-all로
+    // 새어나갔고, 그 결과 클라이언트 입력 오류가 500과 ERROR 스택트레이스로 집계됐다.
+    //
+    // 경고 한 줄만 남기는 이유: 이 경로는 대부분 입력 오류라 ERROR 알림에 섞이면 안 되지만, 드물게
+    // 서버측 읽기 실패가 같은 자리로 들어올 수 있어 흔적이 아예 없으면 문의가 들어와도 추적할 수 없다.
+    // 스택트레이스는 남기지 않는다.
+    @ExceptionHandler(GuestImportFileUnreadableException::class)
+    fun handleImportFileUnreadable(e: GuestImportFileUnreadableException): ResponseEntity<ErrorBody> {
+        log.warn("업로드 파일을 엑셀로 열지 못했습니다: {}", e.cause?.message)
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            .body(ErrorBody(ErrorDetail("IMPORT_FILE_UNREADABLE", e.message ?: "엑셀 파일을 열 수 없습니다")))
+    }
+
+    // 업로드된 엑셀에 열기 암호가 걸림 — 파일 자체는 멀쩡하므로 위 손상 안내와 문구를 공유하지 않는다
+    // (양식을 다시 받아도 암호는 풀리지 않는다).
+    //
+    // 위와 달리 로그를 남기지 않는 것은 의도적이다. 이 예외는 암호화된 내용에서만 나오고 서버 사정으로는
+    // 발생할 수 없어 100% 클라이언트 입력이며, 머리글 불일치와 같은 성격이다.
+    @ExceptionHandler(GuestImportFilePasswordProtectedException::class)
+    fun handleImportFilePasswordProtected(e: GuestImportFilePasswordProtectedException): ResponseEntity<ErrorBody> =
+        ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            .body(
+                ErrorBody(
+                    ErrorDetail("IMPORT_FILE_PASSWORD_PROTECTED", e.message ?: "엑셀 파일의 암호를 해제해 주세요"),
+                ),
+            )
+
     // 현장등록 공개 POST rate limit 초과 — PublicRateLimitInterceptor가 던진다.
     @ExceptionHandler(RateLimitExceededException::class)
     fun handleRateLimitExceeded(e: RateLimitExceededException): ResponseEntity<ErrorBody> =

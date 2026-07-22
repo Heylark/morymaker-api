@@ -1,11 +1,14 @@
 package kr.co.morymaker.api.web
 
 import kr.co.morymaker.api.application.port.`in`.GuestImportRow
+import org.apache.poi.EncryptedDocumentException
 import org.apache.poi.ss.usermodel.Cell
 import org.apache.poi.ss.usermodel.CellType
 import org.apache.poi.ss.usermodel.Row
+import org.apache.poi.ss.usermodel.Workbook
 import org.apache.poi.ss.usermodel.WorkbookFactory
 import org.springframework.web.multipart.MultipartFile
+import java.io.IOException
 
 /**
  * 엑셀 업로드(§4-5·4-6) MultipartFile → [GuestImportRow] 파싱 — api-app(컨트롤러) 전용.
@@ -20,7 +23,7 @@ import org.springframework.web.multipart.MultipartFile
 internal object GuestExcelParser {
 
     fun parse(file: MultipartFile): List<GuestImportRow> {
-        WorkbookFactory.create(file.inputStream).use { workbook ->
+        openWorkbook(file).use { workbook ->
             val sheet = workbook.getSheetAt(0)
 
             // 헤더 계약 검증 — 데이터 행을 읽기 전에 끝낸다. 열 위치가 밀린 파일을 그대로 파싱하면
@@ -53,6 +56,29 @@ internal object GuestExcelParser {
                 )
             }
             return rows
+        }
+    }
+
+    /**
+     * 업로드된 바이트를 워크북으로 여는 단계 — 이 함수의 몸통이 곧 "열지 못한 파일을 사용자 안내로
+     * 번역하는" 경계다. 열기에 성공한 뒤의 시트·행·셀 접근은 이미 메모리에 올라온 구조를 다루므로
+     * 여기의 catch가 닿지 않고, 닿아서도 안 된다.
+     *
+     * 스트림을 여는 첫 줄이 catch 밖에 있는 것은 의도적이다. 그 실패는 서버가 자기 임시 파일을 열지
+     * 못한 것이라 사용자 파일 탓으로 안내하면 거짓이 되고, 이 변경이 없애려는 오분류(입력 오류를 서버
+     * 장애로 표시)의 정확한 반대 방향이 된다.
+     *
+     * 두 catch는 서로 겹치지 않는 타입이라 순서가 동작에 영향을 주지 않는다. 열 수 없는 이유가 다르면
+     * 사용자가 해야 할 일도 다르므로(양식 다시 받기 ↔ 암호 해제) 예외를 하나로 합치지 않는다.
+     */
+    private fun openWorkbook(file: MultipartFile): Workbook {
+        val uploaded = file.inputStream
+        return try {
+            WorkbookFactory.create(uploaded)
+        } catch (e: IOException) {
+            throw GuestImportFileUnreadableException(e)
+        } catch (e: EncryptedDocumentException) {
+            throw GuestImportFilePasswordProtectedException(e)
         }
     }
 

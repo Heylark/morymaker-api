@@ -2,6 +2,10 @@ package kr.co.morymaker.api.web
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import kr.co.morymaker.api.config.SecurityConfig
+import org.apache.poi.openxml4j.opc.OPCPackage
+import org.apache.poi.poifs.crypt.EncryptionInfo
+import org.apache.poi.poifs.crypt.EncryptionMode
+import org.apache.poi.poifs.filesystem.POIFSFileSystem
 import org.apache.poi.xssf.usermodel.XSSFWorkbook
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -21,6 +25,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.transaction.annotation.Transactional
+import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -421,5 +426,102 @@ class GuestControllerTest(
         )
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.error.code").value("IMPORT_HEADER_MISMATCH"))
+    }
+
+    // ── 열지 못한 파일 응답 계약 — preview·confirm 양쪽 동일 차단 ──────
+
+    /** 엑셀이 아닌 바이트를 확장자만 .xlsx로 바꿔 올린 상황을 재현한다. */
+    private fun notAnExcelFile(): MockMultipartFile =
+        MockMultipartFile(
+            "file",
+            "명단.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "이것은 엑셀 파일이 아닙니다".toByteArray(),
+        )
+
+    /** 열기 암호가 걸린 워크북을 재현한다(agile 암호화 모드, 신규 의존성 불요). */
+    private fun passwordProtectedFile(): MockMultipartFile {
+        val plain = run {
+            XSSFWorkbook().use { wb ->
+                val sheet = wb.createSheet("시트")
+                val header = sheet.createRow(0)
+                listOf("이름", "소속", "직함", "연락처", "차량번호", "좌석그룹")
+                    .forEachIndexed { i, v -> header.createCell(i).setCellValue(v) }
+                ByteArrayOutputStream().use { bos ->
+                    wb.write(bos)
+                    bos.toByteArray()
+                }
+            }
+        }
+        val encryptedBytes = POIFSFileSystem().use { fs ->
+            val info = EncryptionInfo(EncryptionMode.agile)
+            val encryptor = info.encryptor
+            encryptor.confirmPassword("morymaker")
+            OPCPackage.open(ByteArrayInputStream(plain)).use { opc ->
+                encryptor.getDataStream(fs).use { out -> opc.save(out) }
+            }
+            ByteArrayOutputStream().use { bos ->
+                fs.writeFilesystem(bos)
+                bos.toByteArray()
+            }
+        }
+        return MockMultipartFile(
+            "file",
+            "명단.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            encryptedBytes,
+        )
+    }
+
+    @Test
+    fun `엑셀이 아닌 파일을 미리보기에 올리면 400 IMPORT_FILE_UNREADABLE을 받는다`() {
+        val eid = createEvent()
+
+        mockMvc.perform(
+            multipart("/events/$eid/guests/import/preview")
+                .file(notAnExcelFile())
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.error.code").value("IMPORT_FILE_UNREADABLE"))
+    }
+
+    @Test
+    fun `엑셀이 아닌 파일을 확정 업로드에 올리면 400 IMPORT_FILE_UNREADABLE을 받는다`() {
+        val eid = createEvent()
+
+        mockMvc.perform(
+            multipart("/events/$eid/guests/import")
+                .file(notAnExcelFile())
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.error.code").value("IMPORT_FILE_UNREADABLE"))
+    }
+
+    @Test
+    fun `암호가 걸린 파일을 미리보기에 올리면 400 IMPORT_FILE_PASSWORD_PROTECTED를 받는다`() {
+        val eid = createEvent()
+
+        mockMvc.perform(
+            multipart("/events/$eid/guests/import/preview")
+                .file(passwordProtectedFile())
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.error.code").value("IMPORT_FILE_PASSWORD_PROTECTED"))
+    }
+
+    @Test
+    fun `암호가 걸린 파일을 확정 업로드에 올리면 400 IMPORT_FILE_PASSWORD_PROTECTED를 받는다`() {
+        val eid = createEvent()
+
+        mockMvc.perform(
+            multipart("/events/$eid/guests/import")
+                .file(passwordProtectedFile())
+                .with(authenticatedAs(roles = listOf("EVENT_ADMIN"), eventIds = listOf(eid))),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.error.code").value("IMPORT_FILE_PASSWORD_PROTECTED"))
     }
 }
