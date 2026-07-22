@@ -358,6 +358,20 @@ class GuestControllerTest(
             .andExpect(jsonPath("$.error.code").value("ROLE_FORBIDDEN"))
     }
 
+    /**
+     * SecurityConfig의 `.anyRequest().authenticated()` 전역 규칙이 신규 엔드포인트에도
+     * 적용되는지 실측 확인. `.with(authenticatedAs(...))`를 전혀
+     * 붙이지 않아 인증 주체가 없는 요청을 그대로 보낸다(cross-event 403·역할게이트 403 TC는
+     * 둘 다 인증은 통과한 상태를 전제하므로 이 경로를 검증하지 못한다).
+     */
+    @Test
+    fun `무인증 요청은 업로드 양식 다운로드에서 401을 받는다`() {
+        val eid = createEvent()
+
+        mockMvc.perform(get("/events/$eid/guests/import/template"))
+            .andExpect(status().isUnauthorized)
+    }
+
     // ── 헤더 불일치 응답 계약(§4-5 V5, ADR-004) — preview·confirm 양쪽 동일 차단 ──
 
     /** 00-research 발견 2 재현 — 연번 열 1개가 앞에 끼어들어 계약 6열이 모두 한 칸씩 밀린 파일. */
